@@ -44,6 +44,11 @@ a{color:var(--gold)}
 footer{border-top:1px solid var(--rule);margin-top:16px}
 footer .wrap{padding:20px 16px 32px;color:var(--dim);font-size:14px}
 footer .px{color:var(--mist);font-size:12px}
+.reel{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(min(100%,520px),1fr);gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:10px}
+.reel figure{scroll-snap-align:start;margin:0}
+.reel video{display:block;width:100%;height:auto;background:#000;border:2px solid var(--rule);image-rendering:pixelated}
+.reel figcaption{margin-top:6px;color:var(--mist);font-size:14px}
+.wip{color:var(--dim);font-size:14px;margin:0 0 12px}
 </style>
 </head>
 <body>
@@ -59,6 +64,18 @@ footer .px{color:var(--mist);font-size:12px}
     <figure class="shot"><img src="/img/cave.png" width="960" height="432" alt="Odysseus faces the giant Polyphemus across a fire inside the cave, with his men behind him."><figcaption>Inside the giant's cave. Only wits will move him.</figcaption></figure>
     <figure class="shot"><img src="/img/strait.png" width="960" height="500" alt="A lone ship rows out across the strait at dusk while the giant stands on the shore."><figcaption>Rowing for open water.</figcaption></figure>
   </div>
+
+  <section>
+    <h2 class="px">From the workshop</h2>
+    <p class="wip">Early prototypes, recorded from the game as it was being built. A lot is changing: side-view action, new fights, the gods' powers, a living world.</p>
+    <div class="reel">
+      <figure><video controls muted playsinline preload="none" poster="/video/fight.jpg" src="/video/fight.mp4"></video><figcaption>The new hands-on fight: leap, slide, slip, shoulder.</figcaption></figure>
+      <figure><video controls muted playsinline preload="none" poster="/video/proto3.jpg" src="/video/proto3.mp4"></video><figcaption>Troy: the Horse, the quarrel, the Oath.</figcaption></figure>
+      <figure><video controls muted playsinline preload="none" poster="/video/proto2.jpg" src="/video/proto2.mp4"></video><figcaption>Ismaros: the feast that ran too long.</figcaption></figure>
+      <figure><video controls muted playsinline preload="none" poster="/video/proto4.jpg" src="/video/proto4.mp4"></video><figcaption>The Lotus Shore: three scouts in the haze.</figcaption></figure>
+      <figure><video controls muted playsinline preload="none" poster="/video/proto1.jpg" src="/video/proto1.mp4"></video><figcaption>The first duels on the beach at dawn.</figcaption></figure>
+    </div>
+  </section>
 
   <section>
     <h2 class="px">Book One</h2>

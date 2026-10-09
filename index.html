@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nobodyssey · An AZTMM game</title>
+<meta name="description" content="A pixel-art adventure retold from Homer's Odyssey. Book One is coming soon, free to play in your browser.">
+<meta property="og:title" content="Nobodyssey · An AZTMM game">
+<meta property="og:description" content="Troy has fallen. Twelve ships and six hundred men turn for home. A pixel-art adventure retold from Homer's Odyssey. Coming soon.">
+<meta property="og:image" content="https://aztmm.com/og-image.png">
+<meta property="og:url" content="https://aztmm.com/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#120d1f">
+<script src="/silkscreen.js"></script>
+<style>
+:root{--abyss:#0c0816;--night:#120d1f;--panel:#1b1430;--rule:#3a2d5c;--gold:#f2c14e;--ember:#e24a3b;--bone:#ece4d0;--mist:#b9b0c9;--dim:#8a809e;--sea:#3fa7b5}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--abyss);color:var(--bone)}
+body{font:17px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+.px{font-family:"Silkscreen",ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase}
+.wrap{max-width:960px;margin:0 auto;padding:0 16px}
+header{background:linear-gradient(180deg,var(--abyss) 0%,var(--night) 100%);border-bottom:1px solid var(--rule)}
+header .wrap{padding-top:48px;padding-bottom:40px}
+.kicker{color:var(--ember);font-size:13px}
+h1{margin:10px 0 2px;font-size:clamp(26px,7.4vw,76px);letter-spacing:.04em;line-height:1;color:var(--gold);text-shadow:0 4px 0 #5a3a10;overflow-wrap:anywhere}
+.wt{color:var(--dim);font-size:12px}
+.lede{max-width:40em;margin:22px 0 0;font-size:19px;color:var(--bone)}
+.soon{display:inline-block;margin-top:26px;padding:12px 18px;border:2px solid var(--gold);color:var(--gold);font-size:14px}
+figure{margin:0}
+.shots{display:grid;grid-template-columns:1fr;gap:16px;padding:32px 0}
+@media(min-width:720px){.shots{grid-template-columns:1.25fr 1fr}}
+.shot img{display:block;width:100%;height:auto;image-rendering:pixelated;border:2px solid var(--rule)}
+.shot figcaption{margin-top:8px;color:var(--mist);font-size:15px}
+section{padding:8px 0 32px}
+h2{font-size:16px;color:var(--gold);margin:0 0 14px}
+.book{max-width:40em;color:var(--mist)}
+.facts{display:grid;grid-template-columns:1fr;gap:0;border-left:3px solid var(--sea);background:var(--panel);padding:6px 18px}
+@media(min-width:720px){.facts{grid-template-columns:1fr 1fr 1fr}}
+.fact{padding:12px 0}
+.fact .px{display:block;color:var(--sea);font-size:12px;margin-bottom:2px}
+.note{color:var(--dim);font-size:14px;margin:12px 0 0}
+a{color:var(--gold)}
+footer{border-top:1px solid var(--rule);margin-top:16px}
+footer .wrap{padding:20px 16px 32px;color:var(--dim);font-size:14px}
+footer .px{color:var(--mist);font-size:12px}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="kicker px">An AZTMM game</div>
+  <h1 class="px">Nobodyssey</h1>
+  <p class="lede">Troy has fallen. Twelve ships and six hundred men turn for home, and you are the one who has to bring them there. A pixel-art adventure retold from Homer's <i>Odyssey</i>.</p>
+  <div class="soon px">Book One · coming soon</div>
+</div></header>
+
+<main class="wrap">
+  <div class="shots">
+    <figure class="shot"><img src="/img/cave.png" width="960" height="432" alt="Odysseus faces the giant Polyphemus across a fire inside the cave, with his men behind him."><figcaption>Inside the giant's cave. Only wits will move him.</figcaption></figure>
+    <figure class="shot"><img src="/img/strait.png" width="960" height="500" alt="A lone ship rows out across the strait at dusk while the giant stands on the shore."><figcaption>Rowing for open water.</figcaption></figure>
+  </div>
+
+  <section>
+    <h2 class="px">Book One</h2>
+    <p class="book">The wooden horse. A feast at Ismaros that goes on too long. A shore where nobody wants to leave. A cave, a giant, and a name that saves your life. Free to play in your browser on phone, tablet and computer, and it keeps working once it has loaded, even with no signal.</p>
+  </section>
+
+  <section>
+    <h2 class="px">For grown-ups</h2>
+    <div class="facts">
+      <div class="fact"><span class="px">Ads</span>None.</div>
+      <div class="fact"><span class="px">Buying</span>Nothing to buy.</div>
+      <div class="fact"><span class="px">Chat</span>None. No stranger can reach your child through the game.</div>
+      <div class="fact"><span class="px">Saves</span>Stay on your own device.</div>
+      <div class="fact"><span class="px">Rating</span>Ages 10 and up. Retold from Homer's <i>Odyssey</i>.</div>
+      <div class="fact"><span class="px">Who made it</span>People and AI together. People designed and directed it; AI tools helped build it.</div>
+    </div>
+    <p class="note">This describes the game as it is today.</p>
+  </section>
+
+  <section>
+    <h2 class="px">Say hello</h2>
+    <p class="book">Questions, ideas, or want to know when Book One is out? Write to <a id="mail" href="#">game at aztmm dot com</a>.</p>
+  </section>
+</main>
+
+<footer><div class="wrap">
+  <div class="px">An AZTMM game · © 2026 AZTMM HLDGS LLC</div>
+  <div>Retold from Homer's <i>Odyssey</i>. Pixel font Silkscreen, <a href="/Silkscreen-OFL.txt">SIL Open Font License</a>.</div>
+</div></footer>
+<script>
+(function () { var u = 'game', d = 'aztmm.com', a = document.getElementById('mail'); if (a) { a.href = 'mailto:' + u + '@' + d; a.textContent = u + '@' + d; } })();
+</script>
+</body>
+</html>

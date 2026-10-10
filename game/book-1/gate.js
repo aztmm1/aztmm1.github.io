@@ -1,10 +1,19 @@
 /* Nobodyssey Book One beta: the tester agreement gate (v2). Shown once per device before the page or the game can be
  * used; the acceptance (name, age bracket, a parent's name for 13 to 17, time, a receipt code) is kept in this
- * browser's storage and shown back as a receipt. Nothing is sent anywhere; the tester emails the receipt. */
+ * browser's storage and shown back as a receipt, and posted once to AZTMM's signature record (tools/beta_sign). */
 (function () {
   var KEY = 'nb_beta_agreement_v1';   // same key, new VERSION: everyone signs v2 once
   var VERSION = 'Beta Test Agreement v2, 10 October 2026';
   var FULL = '/game/book-1/agreement.html';
+  var ENDPOINT = '';   // the signature record (tools/beta_sign in GAME1); '' until the Worker is deployed, then its URL
+  var PEND = 'nb_beta_pending';   // a signed record not yet received by AZTMM (no signal); sent again on the next visit
+  function send(rec, cb) {   // post the signature to AZTMM's record; keep it queued until the server says ok
+    if (!ENDPOINT || !window.fetch) { cb && cb(false); return; }
+    fetch(ENDPOINT + '/sign', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: rec.name, parent: rec.parent || '', age: rec.age, ts: rec.ts, version: rec.version, receipt: rec.receipt, ua: rec.ua || '' }), keepalive: true })
+      .then(function (r) { return r.json(); }).then(function (j) { var ok = !!(j && j.ok); try { if (ok) localStorage.removeItem(PEND); else localStorage.setItem(PEND, '1'); } catch (e) { /* ignore */ } cb && cb(ok); })
+      .catch(function () { try { localStorage.setItem(PEND, '1'); } catch (e) { /* ignore */ } cb && cb(false); });
+  }
+  function resend() { var r = saved(); var p = false; try { p = !!localStorage.getItem(PEND); } catch (e) { /* ignore */ } if (r && p && r.version === VERSION) send(r); }
   function saved() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
   function receipt(name, parent, age, ts) {   // a short code from the names, the age bracket, the time and the version, checkable later
     var s = name + '|' + (parent || '') + '|' + age + '|' + ts + '|' + VERSION, h = 5381;
@@ -17,7 +26,7 @@
     ['Play it, don’t copy it', 'Play it in your browser; that’s all. No downloading, copying, pulling the code apart, modding, or feeding any of it to an AI.'],
     ['Your feedback', 'What you tell us (bugs, notes, ideas) we may use freely, in the game or anywhere, without paying you or naming you. Please don’t send us anything you want to keep.'],
     ['If it goes wrong', 'It’s a test build: it may break, change or disappear, and comes with no promises. If you break these rules, we can ask a court to stop it and claim our losses and legal costs.'],
-    ['Age, privacy and the rest', 'You must be 13 or older; under 18, a parent or guardian must agree below. Nothing about you leaves this device: your save, settings and this signature stay in this browser. New York law applies. This is a summary; the full agreement is the one you sign, and it is linked below.']
+    ['Age, privacy and the rest', 'You must be 13 or older; under 18, a parent or guardian must agree below. Your signature (the names you type, the time, your age bracket and a receipt code) is sent to AZTMM as our record that you agreed; your save and settings stay on this device and nothing else about you is collected. New York law applies. This is a summary; the full agreement is the one you sign, and it is linked below.']
   ];
   var CSS = '#nbgate{position:fixed;inset:0;z-index:9999;background:rgba(6,4,12,.94);display:flex;align-items:center;justify-content:center;padding:14px;font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;color:#ece4d0}' +
     '#nbgate .box{background:#120d1f;border:2px solid #3a2d5c;max-width:620px;width:100%;max-height:100%;display:flex;flex-direction:column}' +
@@ -78,9 +87,9 @@
       var rec = { name: name, parent: parent, age: a === 'teen' ? '13-17' : '18+', ts: ts, version: VERSION, receipt: receipt(name, parent, a, ts), ua: navigator.userAgent.slice(0, 120) };
       try { localStorage.setItem(KEY, JSON.stringify(rec)); } catch (e) { err.textContent = 'Your browser blocks storage; allow it (not a private window) and try again.'; return; }
       g.querySelector('.sc').innerHTML = '<h3 class="px">Signed</h3><p>' + esc(name) + ', ' + esc(ts.replace('T', ' ').slice(0, 16)) + ' UTC.' + (parent ? ' With the consent of ' + esc(parent) + '.' : '') + '</p>' +
-        '<p class="rc">Receipt ' + rec.receipt + '.</p>' +
-        '<p style="margin-top:10px">Please email this receipt code to <a href="mailto:game@aztmm.com?subject=' + encodeURIComponent('Nobodyssey beta receipt ' + rec.receipt) + '">game@aztmm.com</a> from the address we invited you at. It is our only record that you signed; nothing is sent automatically.</p>' +
-        '<p style="margin-top:10px">Thank you. Play it through, then tell us what annoyed you, what you could not work out, and where you stopped.</p>';
+        '<p class="rc">Receipt ' + rec.receipt + '. <span id="nbg-s">Recording your signature…</span></p>' +
+        '<p style="margin-top:10px">Thank you. Play it through, then write to <a href="mailto:game@aztmm.com">game@aztmm.com</a> with what annoyed you, what you could not work out, and where you stopped.</p>';
+      send(rec, function (ok) { var el = g.querySelector('#nbg-s'); if (el) el.textContent = ok ? 'Recorded.' : (ENDPOINT ? 'Not sent yet (no signal); it will be sent next time you open the game.' : ''); });
       g.querySelector('.ft').innerHTML = '<div class="row"><button class="px" id="nbg-go">Continue</button></div>';
       g.querySelector('#nbg-go').addEventListener('click', function () { g.remove(); document.documentElement.style.overflow = ''; onDone(rec); });
     });
@@ -89,7 +98,7 @@
   window.NB_GATE = {
     saved: saved,
     version: VERSION,
-    require: function (onDone) { var r = saved(); if (r && r.version === VERSION) { onDone(r); return; } if (document.body) show(onDone); else document.addEventListener('DOMContentLoaded', function () { show(onDone); }); },
+    require: function (onDone) { var r = saved(); if (r && r.version === VERSION) { resend(); onDone(r); return; } if (document.body) show(onDone); else document.addEventListener('DOMContentLoaded', function () { show(onDone); }); },
     reset: function () { try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ } location.reload(); }
   };
 })();

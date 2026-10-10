@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nobodyssey · Book One · play the open beta</title>
+<meta name="description" content="Nobodyssey is a pixel-art adventure retold from Homer's Odyssey. Book One, open beta: what it is, the story, how to play, the four chapters, and how to support the game.">
+<meta property="og:title" content="Nobodyssey · Book One open beta">
+<meta property="og:description" content="Troy has fallen. Twelve ships and six hundred men turn for home. Play Book One free in your browser, on a phone or a desktop.">
+<meta property="og:image" content="https://aztmm.com/game/book-1/img/horse.jpg">
+<meta property="og:url" content="https://aztmm.com/game/book-1/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#120d1f">
+<meta name="robots" content="noindex">
+<script src="/silkscreen.js"></script>
+<style>
+:root{--abyss:#0c0816;--night:#120d1f;--panel:#1b1430;--rule:#3a2d5c;--gold:#f2c14e;--ember:#e24a3b;--bone:#ece4d0;--mist:#b9b0c9;--dim:#8a809e;--sea:#3fa7b5}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+html,body{margin:0;background:var(--abyss);color:var(--bone)}
+body{font:17px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+.px{font-family:"Silkscreen",ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase}
+.wrap{max-width:960px;margin:0 auto;padding:0 16px}
+a{color:var(--gold)}
+/* top bar */
+nav.top{position:sticky;top:0;z-index:5;background:rgba(12,8,22,.92);backdrop-filter:blur(6px);border-bottom:1px solid var(--rule)}
+nav.top .wrap{display:flex;align-items:center;gap:14px;height:52px;overflow-x:auto;white-space:nowrap}
+nav.top a{color:var(--mist);text-decoration:none;font-size:11px}
+nav.top a:hover{color:var(--gold)}
+nav.top .brand{color:var(--gold);margin-right:auto}
+nav.top .go{color:var(--abyss);background:var(--gold);padding:7px 12px}
+/* hero */
+header{background:linear-gradient(180deg,var(--abyss) 0%,var(--night) 100%);border-bottom:1px solid var(--rule)}
+header .wrap{padding-top:40px;padding-bottom:36px}
+.kicker{color:var(--ember);font-size:13px}
+h1{margin:10px 0 2px;font-size:clamp(26px,7.4vw,64px);letter-spacing:.04em;line-height:1;color:var(--gold);text-shadow:0 4px 0 #5a3a10;overflow-wrap:anywhere}
+.sub{color:var(--mist);font-size:13px;margin-top:8px}
+.lede{max-width:40em;margin:22px 0 0;font-size:19px;color:var(--bone)}
+.cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:26px}
+.play{display:inline-block;padding:14px 22px;background:var(--gold);color:var(--abyss);font-size:15px;text-decoration:none;border:2px solid var(--gold);box-shadow:0 4px 0 #5a3a10}
+.play:hover{background:#ffd770}
+.ghost{display:inline-block;padding:14px 18px;border:2px solid var(--rule);color:var(--mist);font-size:13px;text-decoration:none}
+.ghost:hover{border-color:var(--gold);color:var(--gold)}
+.howto{margin-top:14px;color:var(--dim);font-size:14px}
+/* sections */
+section{padding:36px 0 8px;border-bottom:1px solid var(--rule)}
+section:last-of-type{border-bottom:0}
+h2{font-size:16px;color:var(--gold);margin:0 0 6px}
+.eyebrow{color:var(--sea);font-size:11px;margin-bottom:10px}
+p{max-width:44em;color:var(--mist)}
+p.big{color:var(--bone);font-size:18px}
+ul,ol{max-width:44em;color:var(--mist);padding-left:22px}
+li{margin:6px 0}
+li b{color:var(--bone)}
+.two{display:grid;grid-template-columns:1fr;gap:20px}
+@media(min-width:720px){.two{grid-template-columns:1fr 1fr}}
+.chapters{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px}
+@media(min-width:720px){.chapters{grid-template-columns:1fr 1fr}}
+.ch{background:var(--panel);border:1px solid var(--rule)}
+.ch img{display:block;width:100%;height:auto;image-rendering:pixelated;border-bottom:1px solid var(--rule)}
+.ch .body{padding:14px 16px 16px}
+.ch .n{color:var(--sea);font-size:12px}
+.ch h3{margin:4px 0 6px;font-size:17px;color:var(--bone)}
+.ch p{margin:0;font-size:15px}
+.ch .verb{margin-top:10px;color:var(--dim);font-size:13px}
+.steps{counter-reset:s;list-style:none;padding:0;max-width:44em}
+.steps li{counter-increment:s;position:relative;padding:12px 0 12px 54px;border-top:1px solid var(--rule)}
+.steps li::before{content:counter(s);position:absolute;left:0;top:10px;width:38px;height:38px;display:grid;place-items:center;border:2px solid var(--gold);color:var(--gold);font-family:"Silkscreen",monospace;font-size:14px}
+.ctl{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:44em;margin-top:14px}
+@media(min-width:720px){.ctl{grid-template-columns:repeat(4,1fr)}}
+.ctl div{background:var(--panel);border:1px solid var(--rule);padding:12px 14px;font-size:14px;color:var(--mist)}
+.ctl b{display:block;color:var(--gold);font-size:12px;margin-bottom:4px}
+.facts{display:grid;grid-template-columns:1fr;border-left:3px solid var(--sea);background:var(--panel);padding:6px 18px;margin-top:14px}
+@media(min-width:720px){.facts{grid-template-columns:1fr 1fr 1fr}}
+.fact{padding:12px 0}
+.fact .px{display:block;color:var(--sea);font-size:12px;margin-bottom:2px}
+.film{display:grid;grid-template-columns:1fr;gap:20px;align-items:start;margin-top:14px}
+@media(min-width:720px){.film{grid-template-columns:minmax(0,300px) 1fr}}
+.film video{display:block;width:100%;max-width:300px;height:auto;background:#000;border:2px solid var(--rule)}
+.film p{margin:0 0 12px}
+.support{display:grid;grid-template-columns:1fr;gap:14px;margin-top:14px}
+@media(min-width:720px){.support{grid-template-columns:1fr 1fr 1fr}}
+.card{background:var(--panel);border:1px solid var(--rule);padding:16px}
+.card h3{margin:0 0 8px;font-size:13px;color:var(--gold)}
+.card p{margin:0;font-size:15px}
+footer{border-top:1px solid var(--rule);margin-top:28px}
+footer .wrap{padding:20px 16px 32px;color:var(--dim);font-size:14px}
+footer .px{color:var(--mist);font-size:12px}
+</style>
+</head>
+<body>
+
+<nav class="top"><div class="wrap px">
+  <a class="brand" href="/">Nobodyssey</a>
+  <a href="#what">What this is</a>
+  <a href="#story">The story</a>
+  <a href="#howto">How to play</a>
+  <a href="#chapters">Chapters</a>
+  <a href="#inside">Inside</a>
+  <a href="#watch">Watch</a>
+  <a href="#support">Support us</a>
+  <a class="go" href="/game/book-1/play.html">▶ Play</a>
+</div></nav>
+
+<header><div class="wrap">
+  <div class="kicker px">An AZTMM game · open beta</div>
+  <h1 class="px">Book One</h1>
+  <div class="sub px">Troy · Ismaros · The Lotus Shore · The Cyclops' Cave</div>
+  <p class="lede">Troy has fallen. Twelve ships and six hundred men turn for home, and you are the one who has to bring them there. A pixel-art adventure retold from Homer's <i>Odyssey</i>. Four chapters, about an hour, free in your browser.</p>
+  <div class="cta">
+    <a class="play px" href="/game/book-1/play.html">▶ Play Book One</a>
+    <a class="ghost px" href="#howto">How to play</a>
+  </div>
+  <p class="howto">Nothing to install. Best on a phone held sideways with the sound on. Works offline once loaded.</p>
+</div></header>
+
+<main class="wrap">
+
+<section id="what">
+  <div class="eyebrow px">01 · What this is</div>
+  <h2 class="px">A small studio's retelling of the oldest adventure story</h2>
+  <p class="big">Nobodyssey is an 8-bit adventure game made from Homer's <i>Odyssey</i>, chapter by chapter, by one person and the AI working beside him. This page is Book One of four: the first stretch of the voyage home, from the night inside the wooden horse to the morning you sail away from the Cyclops' island.</p>
+  <div class="two">
+    <div>
+      <p><b>Open beta</b> means the whole of Book One is here and playable start to finish, and we are listening. It is free, and will stay free. What you tell us shapes what we fix before Book Two.</p>
+      <p><b>The name.</b> Odysseus tells the Cyclops his name is Nobody, and it is the lie that saves him. The game is about the man who had to become nobody to get home.</p>
+    </div>
+    <div>
+      <p><b>What it is not.</b> Not a film tie-in, not a copy of any other game. Every sprite, tune and line was made for this, from the Greek text, with the old translations open beside it. There are no purchases, no ads, no accounts, and nothing leaves your device.</p>
+      <p><b>Who it is for.</b> Teens and grown-ups who grew up on handheld adventures, or who read the <i>Odyssey</i> once and want to feel it under their thumbs. Rated Teen: fights land, men can die, never in gore.</p>
+    </div>
+  </div>
+</section>
+
+<section id="story">
+  <div class="eyebrow px">02 · The story so far</div>
+  <h2 class="px">The way home is longer than the war</h2>
+  <p class="big">Ten years at Troy end in the belly of a wooden horse. Thirty men in the dark, one lamp, a city hauling you through its own gate. By dawn Troy is burning and the war is over. Twelve ships, six hundred men, and the sea between you and Ithaca.</p>
+  <p>Book One follows the first four landfalls, as Homer tells them. At <b>Ismaros</b> the men sack a city and stay too long for the wine, and the Cicones come back at dawn with horns. On the <b>Lotus Shore</b> three scouts eat the flower and forget they ever had a home. In the <b>Cyclops' cave</b> a giant eats your men two at a time, and the only way out is a sharpened stake, a jar of wine, and a name that is not a name.</p>
+  <p>You play Odysseus. Not a superhero: a captain who counts his men every night, and loses some. The ones you lose stay lost. The game keeps their names in the Roll so you remember them too.</p>
+</section>
+
+<section id="howto">
+  <div class="eyebrow px">03 · How to play</div>
+  <h2 class="px">Five minutes to learn, an hour to finish</h2>
+  <ol class="steps">
+    <li><b>Open the game</b> with the Play button. On a phone, turn it sideways; the picture gets bigger and the controls sit under your thumbs. On a desktop, the keyboard works at once.</li>
+    <li><b>Press New game.</b> The first minute inside the Horse teaches one move at a time: a small card names the button you need the moment you need it. If you stand still for a few seconds, the right button pulses.</li>
+    <li><b>Read the goal line</b> at the top of the screen. It always says the one thing you are doing now. The chart between chapters shows where you are on the voyage.</li>
+    <li><b>Lose a man, keep going.</b> A torch is a checkpoint; if something goes wrong you rewind a few seconds, not minutes. Your place is saved on the device at every torch, and <b>Continue</b> on the title picks it up, even after you close the browser.</li>
+    <li><b>Listen.</b> A cough in the dark, the giant's snore, the horns up the river: the sounds are tells. Sound on is the way it is meant to be played; Captions and Mono are in Settings if you need them.</li>
+  </ol>
+  <h2 class="px" style="margin-top:22px">The controls</h2>
+  <div class="ctl">
+    <div><b class="px">Stick</b>Left thumb. Move, any angle. It floats to wherever your thumb lands.</div>
+    <div><b class="px">X · Jump</b>Leap, hop, climb. Hold for a higher leap.</div>
+    <div><b class="px">A · Hand</b>Catch, hold a man, use, pick up, strike.</div>
+    <div><b class="px">B · Voice</b>A hush in quiet places, a call in loud ones.</div>
+    <div><b class="px">Y · Power</b>Ask the gods at a torch. The bow: hold to draw, aim with the stick, let go.</div>
+    <div><b class="px">Menu</b>Pause, settings, the Roll, the Voyage Book, credits.</div>
+    <div><b class="px">Keyboard</b>Arrows move, Space jumps, Z hand, X voice, L power, C menu.</div>
+    <div><b class="px">Gamepad</b>Left stick and the four face buttons, the same way.</div>
+  </div>
+  <p class="howto" style="margin-top:14px">Settings: stick size, left-handed swap, button opacity, text size, text speed, read aloud, less motion, music and sound levels, challenge (Gentle, Standard, Bold).</p>
+</section>
+
+<section id="chapters">
+  <div class="eyebrow px">04 · The four chapters</div>
+  <h2 class="px">In the order Homer tells them</h2>
+  <div class="chapters">
+    <figure class="ch"><img src="img/horse.jpg" alt="Inside the wooden horse at night: men crouched in the dark hull, Odysseus lit by one lamp" width="1140" height="650" loading="lazy">
+      <div class="body"><div class="n px">I · Troy</div><h3>Inside the Horse</h3><p>Keep thirty men silent through the night while Troy hauls you through its own gate, then get them out before the city wakes.</p><div class="verb">Crawl, hush, catch, count. A stealth level. About 7 minutes.</div></div></figure>
+    <figure class="ch"><img src="img/ismaros.jpg" alt="The ships beached at Ismaros at dawn, a red-cloaked Odysseus on the sand" width="1140" height="650" loading="lazy">
+      <div class="body"><div class="n px">II · Ismaros</div><h3>The ships at Ismaros</h3><p>The first landfall, the first plunder, the first bad decision. Hold the beach till the horns, take up your own bow from Troy, and learn what staying for the wine costs.</p><div class="verb">Run, leap, the bow, the horns. An action level. About 15 minutes.</div></div></figure>
+    <figure class="ch"><img src="img/lotus.jpg" alt="The Lotus Shore: pink haze over dunes, a man asleep by the water" width="1140" height="650" loading="lazy">
+      <div class="body"><div class="n px">III · The Lotus Shore</div><h3>The sweet hollows</h3><p>Three men went to ask who lives here and did not come back. Go in after them through the haze, and carry each one home before the flower takes you too.</p><div class="verb">Carry, duck, hop, hush. A rescue in four parts. About 14 minutes.</div></div></figure>
+    <figure class="ch"><img src="img/cyclops.jpg" alt="The Cyclops' house: a cave of stone, stacked cheeses, a lit fire" width="1140" height="650" loading="lazy">
+      <div class="body"><div class="n px">IV · The Cyclops' Cave</div><h3>The giant's house</h3><p>A cave full of cheese and a door nobody can move. Work by day, hide by night, sharpen the stake, learn his snore, and ride out under the ram with a name he will never forget.</p><div class="verb">Craft, hide, the count, the ride. The Book's boss in three phases. About 26 minutes.</div></div></figure>
+  </div>
+</section>
+
+<section id="inside">
+  <div class="eyebrow px">05 · Inside Book One</div>
+  <h2 class="px">What you are getting</h2>
+  <div class="facts">
+    <div class="fact"><span class="px">Length</span>About an hour at a player's pace: four chapters, nine side-view levels, the voyage and the hubs between them.</div>
+    <div class="fact"><span class="px">The source</span>Homer's <i>Odyssey</i>, Books 9 and 12, from the Greek with Murray and Butler open beside it. Nothing from any film.</div>
+    <div class="fact"><span class="px">Your men</span>Six hundred names on twelve ships. The ones you lose stay lost; the Roll remembers them.</div>
+    <div class="fact"><span class="px">The economy</span>Bronze, cups, tripods, cloaks and wine, won in play and spent on offerings and gifts. Nothing is bought with real money, ever.</div>
+    <div class="fact"><span class="px">The relics</span>Each ship's crew holds a relic for the one who earns their trust. The Swallow's bowstring is the first. Twelve of them make something, in Book Four.</div>
+    <div class="fact"><span class="px">The gods</span>Athena, Poseidon, Apollo and Hermes answer at the torches, each in their own way, and not always kindly.</div>
+    <div class="fact"><span class="px">Sound</span>Fourteen songs, the wind and the sea under them, every effect made on your device as you play.</div>
+    <div class="fact"><span class="px">Tech</span>320 × 180 pixels, plain code, one file, no download, works offline. Phone, tablet, desktop, gamepad.</div>
+    <div class="fact"><span class="px">Made by</span>People and AI together, under one person's eye, at AZTMM.</div>
+  </div>
+</section>
+
+<section id="watch">
+  <div class="eyebrow px">06 · Watch</div>
+  <h2 class="px">Fifty-five seconds of real play</h2>
+  <div class="film">
+    <video controls playsinline preload="metadata" poster="img/poster.jpg" width="720" height="1280">
+      <source src="book1_pov.mp4" type="video/mp4">
+    </video>
+    <div>
+      <p>Captured from the actual build, not staged: the Horse, Ismaros, the Lotus Shore and the Cyclops' cave, each with its own music and the game's own sounds, the thumbs' controls moving as he plays.</p>
+      <p class="howto"><a href="book1_pov.mp4" download>Download the clip</a> (MP4, 9:16, 720 × 1280) to share on TikTok, Reels or Shorts. Five earlier landscape clips are on the <a href="/#workshop">front page</a>.</p>
+    </div>
+  </div>
+</section>
+
+<section id="support">
+  <div class="eyebrow px">07 · Support us</div>
+  <h2 class="px">The game is free. Here is what helps.</h2>
+  <div class="support">
+    <div class="card"><h3 class="px">Play it and tell us</h3><p>Finish Book One, or get stuck trying, and write to <a id="mail" href="#">game at aztmm dot com</a>: what annoyed you, what you could not work out, where you stopped. Every note gets read and most of them get fixed before Book Two.</p></div>
+    <div class="card"><h3 class="px">Share it</h3><p>Send the link to one person who would like it, or post the clip above. A small studio lives on word of mouth, not ads.</p></div>
+    <div class="card"><h3 class="px">Follow the voyage</h3><p>Books Two, Three and Four are coming: the Laestrygonians and the stars, Circe, the dead, the Sirens, Scylla, and the hall at Ithaca. Write to us and we will tell you when each one is out.</p></div>
+  </div>
+  <p class="howto" style="margin-top:16px">Beta notes. Known: an Ismaros resume restarts its phase rather than the exact torch; one card between the Cyclops' house and the dark shows over a plain black screen. Your saves live only on this device.</p>
+</section>
+
+</main>
+<footer><div class="wrap">
+  <div class="px">An AZTMM game · © 2026 AZTMM HLDGS LLC</div>
+  <div>Made by people and AI together. Retold from Homer's <i>Odyssey</i>. Nobodyssey is a trademark of AZTMM HLDGS LLC. <a href="/">Home</a></div>
+</div></footer>
+<script>
+(function(){var a=document.getElementById('mail');if(a){var u='game'+'@'+'aztmm.com';a.href='mailto:'+u;a.textContent=u;}})();
+</script>
+</body>
+</html>

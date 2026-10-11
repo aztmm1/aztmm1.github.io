@@ -5,7 +5,7 @@
   var KEY = 'nb_beta_agreement_v1';   // same key, new VERSION: everyone signs v2 once
   var VERSION = 'Beta Test Agreement v2, 10 October 2026';
   var FULL = '/game/book-1/agreement.html';
-  var ENDPOINT = '';   // the signature record (tools/beta_sign in GAME1); '' until the Worker is deployed, then its URL
+  var ENDPOINT = 'https://nobodyssey-beta.aztmmhldgs.workers.dev';   // the signature record (tools/beta_sign in GAME1); '' until the Worker is deployed, then its URL
   var PEND = 'nb_beta_pending';   // a signed record not yet received by AZTMM (no signal); sent again on the next visit
   function send(rec, cb) {   // post the signature to AZTMM's record; keep it queued until the server says ok
     if (!ENDPOINT || !window.fetch) { cb && cb(false); return; }

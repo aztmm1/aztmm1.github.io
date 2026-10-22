@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nobodyssey · An AZTMM game</title>
-<meta name="description" content="A pixel-art adventure retold from Homer's Odyssey. Book One is in private beta, free to play in your browser.">
+<meta name="description" content="An adventure retold from Homer's Odyssey: pixel-art people in lit 3D places, and fights you play in real time. Book One is in private beta, free to play in your browser.">
 <meta property="og:title" content="Nobodyssey · An AZTMM game">
-<meta property="og:description" content="Troy has fallen. Twelve ships and six hundred men turn for home. A pixel-art adventure retold from Homer's Odyssey. Book One beta, free in your browser.">
+<meta property="og:description" content="Troy has fallen. Twelve ships and six hundred men turn for home. An adventure retold from Homer's Odyssey, with pixel-art people in lit 3D places. Book One beta, free in your browser.">
 <meta property="og:image" content="https://aztmm.com/og-image.png">
 <meta property="og:url" content="https://aztmm.com/">
 <meta property="og:type" content="website">
@@ -29,8 +29,8 @@ h1{margin:10px 0 2px;font-size:clamp(26px,7.4vw,76px);letter-spacing:.04em;line-
 .soon{display:inline-block;margin-top:26px;padding:12px 18px;border:2px solid var(--gold);color:var(--gold);font-size:14px}
 figure{margin:0}
 .shots{display:grid;grid-template-columns:1fr;gap:16px;padding:32px 0}
-@media(min-width:720px){.shots{grid-template-columns:1.25fr 1fr}}
-.shot img{display:block;width:100%;height:auto;image-rendering:pixelated;border:2px solid var(--rule)}
+@media(min-width:720px){.shots{grid-template-columns:1fr 1fr;align-items:start}}
+.shot img{display:block;width:100%;height:auto;border:2px solid var(--rule)}
 .shot figcaption{margin-top:8px;color:var(--mist);font-size:15px}
 section{padding:8px 0 32px}
 h2{font-size:16px;color:var(--gold);margin:0 0 14px}
@@ -44,9 +44,9 @@ a{color:var(--gold)}
 footer{border-top:1px solid var(--rule);margin-top:16px}
 footer .wrap{padding:20px 16px 32px;color:var(--dim);font-size:14px}
 footer .px{color:var(--mist);font-size:12px}
-.reel{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(min(100%,260px),300px);gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:10px}
-.reel figure{scroll-snap-align:start;margin:0}
-.reel video{display:block;width:100%;height:auto;background:#000;border:2px solid var(--rule);image-rendering:pixelated}
+.reel{display:grid;grid-template-columns:1fr;gap:14px}
+.reel figure{margin:0}
+.reel video{display:block;width:100%;height:auto;aspect-ratio:16/9;background:#000;border:2px solid var(--rule)}
 .reel figcaption{margin-top:6px;color:var(--mist);font-size:14px}
 .wip{color:var(--dim);font-size:14px;margin:0 0 12px}
 </style>
@@ -55,28 +55,27 @@ footer .px{color:var(--mist);font-size:12px}
 <header><div class="wrap">
   <div class="kicker px">An AZTMM game</div>
   <h1 class="px">Nobodyssey</h1>
-  <p class="lede">Troy has fallen. Twelve ships and six hundred men turn for home, and you are the one who has to bring them there. A pixel-art adventure retold from Homer's <i>Odyssey</i>.</p>
+  <p class="lede">Troy has fallen. Twelve ships and six hundred men turn for home, and you are the one who has to bring them there. Retold from Homer's <i>Odyssey</i>, with pixel-art people in lit 3D places and fights you play with your own hands.</p>
   <a class="soon px" href="/game/book-1/" style="text-decoration:none;background:var(--gold);color:var(--abyss)">▶ Play the Book One beta</a>
 </div></header>
 
 <main class="wrap">
   <div class="shots">
-    <figure class="shot"><img src="/img/cave.png" width="960" height="432" alt="Odysseus drives the glowing stake toward the sleeping giant's eye inside the cave."><figcaption>Inside the giant's cave. The stake, the count, the eye.</figcaption></figure>
-    <figure class="shot"><img src="/img/strait.png" width="960" height="500" alt="A lone ship rows out across the strait at dusk while the giant stands on the shore."><figcaption>Rowing for open water.</figcaption></figure>
+    <figure class="shot"><img src="/game/book-1/img/ismaros.jpg" width="1280" height="720" alt="On the beach at Ismaros: Odysseus with his round shield takes a blow from the Ciconian captain in his crested helmet, the crews watching between two black ships."><figcaption>The Ciconian captain, on the beach at Ismaros.</figcaption></figure>
+    <figure class="shot"><img src="/game/book-1/img/troy.jpg" width="1280" height="720" alt="Troy at night: Odysseus and Menelaus in a dark street lit by a single torch, a guard's lamp sweeping the stones."><figcaption>Troy at night, keeping out of the light.</figcaption></figure>
   </div>
 
   <section>
     <h2 class="px" id="workshop">From the workshop</h2>
     <p class="wip">Recorded from the current beta build, not staged.</p>
     <div class="reel">
-      <figure><video controls muted playsinline preload="none" poster="/video/v21.jpg" src="/video/v21_20s.mp4"></video><figcaption>Book One as it plays today: the hands-on fights, the night sky over Troy, the giant's cave.</figcaption></figure>
-      <figure><video controls muted loop playsinline preload="none" poster="/video/v21.jpg" src="/video/v21_loop.mp4"></video><figcaption>Nine seconds of the fight.</figcaption></figure>
+      <figure><video controls muted loop playsinline preload="none" poster="/game/book-1/img/fight.jpg" src="/game/book-1/fight.mp4" width="960" height="540"></video><figcaption>Ten seconds of a fight at Ismaros: cuts, the shield, a chain of three. No sound on this one.</figcaption></figure>
     </div>
   </section>
 
   <section>
     <h2 class="px">Book One</h2>
-    <p class="book">The wooden horse, and a burning city to fight through street by street. A feast at Ismaros that goes on too long. A shore where nobody wants to leave. A cave, a giant, and a name that saves your life. Free to play in your browser on phone, tablet and computer, and it keeps working once it has loaded, even with no signal.</p>
+    <p class="book">The wooden horse, and Troy at night, crossed in the dark or by the sword. A feast at Ismaros that goes on too long. A shore where nobody wants to leave. An island full of goats. A cave, a giant, and a name that saves your life. Free to play in your browser on phone, tablet and computer, and it keeps working once it has loaded, even with no signal.</p>
   </section>
 
   <section>

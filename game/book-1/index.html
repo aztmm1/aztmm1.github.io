@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nobodyssey · Book One · private beta</title>
-<meta name="description" content="Nobodyssey is a pixel-art adventure retold from Homer's Odyssey. Book One, private beta: what it is, the story, how to play, the four chapters, and how to support the game.">
+<meta name="description" content="Nobodyssey is an adventure retold from Homer's Odyssey, with pixel-art people in lit 3D places and fights played in real time. Book One, private beta: what it is, the story, how to play, the places, and how to support the game.">
 <meta property="og:title" content="Nobodyssey · Book One private beta">
 <meta property="og:description" content="Troy has fallen. Twelve ships and six hundred men turn for home. Play Book One free in your browser, on a phone or a desktop.">
-<meta property="og:image" content="https://aztmm.com/game/book-1/img/horse.jpg">
+<meta property="og:image" content="https://aztmm.com/game/book-1/img/ismaros.jpg">
 <meta property="og:url" content="https://aztmm.com/game/book-1/">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -58,7 +58,7 @@ li b{color:var(--bone)}
 .chapters{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px}
 @media(min-width:720px){.chapters{grid-template-columns:1fr 1fr}}
 .ch{background:var(--panel);border:1px solid var(--rule)}
-.ch img{display:block;width:100%;height:auto;image-rendering:pixelated;border-bottom:1px solid var(--rule)}
+.ch img{display:block;width:100%;height:auto;border-bottom:1px solid var(--rule)}
 .ch .body{padding:14px 16px 16px}
 .ch .n{color:var(--sea);font-size:12px}
 .ch h3{margin:4px 0 6px;font-size:17px;color:var(--bone)}
@@ -76,8 +76,8 @@ li b{color:var(--bone)}
 .fact{padding:12px 0}
 .fact .px{display:block;color:var(--sea);font-size:12px;margin-bottom:2px}
 .film{display:grid;grid-template-columns:1fr;gap:20px;align-items:start;margin-top:14px}
-@media(min-width:720px){.film{grid-template-columns:minmax(0,300px) 1fr}}
-.film video{display:block;width:100%;max-width:300px;height:auto;background:#000;border:2px solid var(--rule)}
+.film video{display:block;width:100%;height:auto;aspect-ratio:16/9;background:#000;border:2px solid var(--rule)}
+.film p{max-width:44em}
 .film p{margin:0 0 12px}
 .support{display:grid;grid-template-columns:1fr;gap:14px;margin-top:14px}
 @media(min-width:720px){.support{grid-template-columns:1fr 1fr 1fr}}
@@ -97,7 +97,7 @@ footer .px{color:var(--mist);font-size:12px}
   <a href="#what">What this is</a>
   <a href="#story">The story</a>
   <a href="#howto">How to play</a>
-  <a href="#chapters">Chapters</a>
+  <a href="#chapters">The places</a>
   <a href="#inside">Inside</a>
   <a href="#watch">Watch</a>
   <a href="#support">Support us</a>
@@ -107,8 +107,8 @@ footer .px{color:var(--mist);font-size:12px}
 <header><div class="wrap">
   <div class="kicker px">An AZTMM game · private beta</div>
   <h1 class="px">Book One</h1>
-  <div class="sub px">Troy · Ismaros · The Lotus Shore · The Cyclops' Cave</div>
-  <p class="lede">Troy has fallen. Twelve ships and six hundred men turn for home, and you are the one who has to bring them there. A pixel-art adventure retold from Homer's <i>Odyssey</i>. Four chapters, about eighty minutes, free in your browser.</p>
+  <div class="sub px">Troy · Tenedos · Ismaros · The Lotus Shore · Goat Island · The Cyclops' Cave</div>
+  <p class="lede">Troy has fallen. Twelve ships and six hundred men turn for home, and you are the one who has to bring them there. Retold from Homer's <i>Odyssey</i>: pixel-art people in lit 3D places, and fights you play with your own hands. Free in your browser.</p>
   <div class="cta">
     <a class="play px" href="/game/book-1/play.html">▶ Play Book One</a>
     <a class="ghost px" href="#howto">How to play</a>
@@ -121,7 +121,7 @@ footer .px{color:var(--mist);font-size:12px}
 <section id="what">
   <div class="eyebrow px">01 · What this is</div>
   <h2 class="px">A small studio's retelling of the oldest adventure story</h2>
-  <p class="big">Nobodyssey is an 8-bit adventure game made from Homer's <i>Odyssey</i>, chapter by chapter, by one person and the AI working beside him. This page is Book One of four: the first stretch of the voyage home, from the night inside the wooden horse to the morning you sail away from the Cyclops' island.</p>
+  <p class="big">Nobodyssey is an adventure game made from Homer's <i>Odyssey</i>, by one person and the AI working beside him. The people are pixel art. The places around them are built in 3D and lit by the hour: sunset on the beach at Troy, torchlight in its streets, the fire in the Cyclops' cave. This page is Book One of four: the first stretch of the voyage home, from the night inside the wooden horse to the morning you sail away from the Cyclops' island.</p>
   <div class="two">
     <div>
       <p><b>Private beta</b> means the whole of Book One is here and playable start to finish, by invitation, and we are listening. Keep it to the people we invited. It is free, and will stay free. What you tell us shapes what we fix before Book Two.</p>
@@ -137,47 +137,51 @@ footer .px{color:var(--mist);font-size:12px}
 <section id="story">
   <div class="eyebrow px">02 · The story so far</div>
   <h2 class="px">The way home is longer than the war</h2>
-  <p class="big">Ten years at Troy end in the belly of a wooden horse. Thirty men in the dark, one lamp, a city hauling you through its own gate. Then the drop into the streets, and the worst fight of the night at the house of Deiphobus. By dawn Troy is burning and the war is over. Twelve ships, six hundred men, and the sea between you and Ithaca.</p>
-  <p>Book One follows the first four landfalls, as Homer tells them. At <b>Ismaros</b> the men sack a city and stay too long for the wine, and the Cicones come back at dawn with horns. On the <b>Lotus Shore</b> three scouts eat the flower and forget they ever had a home. In the <b>Cyclops' cave</b> a giant eats your men two at a time, and the only way out is a sharpened stake, a jar of wine, and a name that is not a name.</p>
-  <p>You play Odysseus. Not a superhero: a captain who counts his men every night, and loses some. The ones you lose stay lost. The game keeps their names in the Roll so you remember them too.</p>
+  <p class="big">Ten years at Troy end in the belly of a wooden horse. Thirty men in the dark, and a city hauling you through its own gate. Then Troy at night: keep to the dark side of the streets or fight your way through, all the way to the house of Deiphobus. Then the camp on the beach, the kings' assembly, and the ships turning for home.</p>
+  <p>Book One follows the landfalls as Homer tells them. At <b>Ismaros</b> the men take the town and stay too long for the wine, and the Cicones come back at dawn with more men than you have. On the <b>Lotus Shore</b> your scouts eat the flower and forget they ever had a home, and you drag them back to the ships crying. <b>Goat Island</b> feeds the crews for once. In the <b>Cyclops' cave</b> a giant eats your men two at a time, and the only way out is a jar of wine, a sharpened stake, his rams, and a name that is not a name.</p>
+  <p>You play Odysseus. Not a superhero: a captain who counts his men every night, and loses some. Between landfalls you make camp, and the men eat, mend the ship and tell their stories round the fire. The ones you lose stay lost. The game keeps their names in the Roll so you remember them too.</p>
 </section>
 
 <section id="howto">
   <div class="eyebrow px">03 · How to play</div>
-  <h2 class="px">Learned as you go, eighty minutes to finish</h2>
+  <h2 class="px">Learned as you go</h2>
   <ol class="steps">
-    <li><b>Open the game</b> with the Play button. On a phone, turn it sideways; the picture gets bigger and the controls sit under your thumbs. On a desktop, the keyboard works at once.</li>
-    <li><b>Press New game.</b> Chapter One teaches one move at a time. A button only appears on screen the first time you need it, and one of your men tells you what it is for. By the time you reach Ismaros you have every move.</li>
-    <li><b>Read the goal line</b> at the top of the screen. It always says the one thing you are doing now. The chart between chapters shows where you are on the voyage.</li>
-    <li><b>Lose a man, keep going.</b> A torch is a checkpoint; if something goes wrong you rewind a few seconds, not minutes. Your place is saved on the device at every torch, and <b>Continue</b> on the title picks it up, even after you close the browser.</li>
-    <li><b>Listen.</b> A cough in the dark, the giant's snore, the horns up the river: the sounds are tells. Sound on is the way it is meant to be played; Captions and Mono are in Settings if you need them.</li>
+    <li><b>Open the game</b> with the Play button. On a phone, turn it sideways; the picture gets bigger and the controls sit under your thumbs. On a desktop, the keyboard works at once, and so does a gamepad.</li>
+    <li><b>Press New game.</b> Each thing you can do is shown once, the first time you need it, by whoever is standing next to you. After that it is yours.</li>
+    <li><b>Read the card at the top right.</b> It says what you are doing now, and a bronze diamond marks the person or the place. Lost? Press Tab, or tap <b>Where now?</b>, and Odysseus shows you the way.</li>
+    <li><b>Fight with your hands.</b> A fight is one man against one man, in real time. Watch his wind-up, raise your shield or tap it as the blow lands, roll away from the low sweeps, then answer with a chain of cuts. Fill Kleos and finish him.</li>
+    <li><b>Stop when you like.</b> P or Start pauses. T opens The Tale and your bag. Your place is saved on the device as you go, and <b>Continue</b> on the title picks it up, even after you close the browser.</li>
   </ol>
   <h2 class="px" style="margin-top:22px">The controls</h2>
   <div class="ctl">
     <div><b class="px">Stick</b>Left thumb. Move, any angle. It floats to wherever your thumb lands.</div>
-    <div><b class="px">X · Jump</b>Leap, hop, climb. Hold for a higher leap. In a fight, with the stick held away, hop back out of reach.</div>
-    <div><b class="px">A · Hand</b>Catch, hold a man, use, pick up. In a fight, tap to strike and hold for a heavy blow that breaks a shield.</div>
-    <div><b class="px">B · Voice</b>A hush in quiet places, a call in loud ones. In a fight, hold to raise your shield and tap to shove.</div>
-    <div><b class="px">Y · Power</b>Ask the gods at a torch. The bow: hold to draw, aim with the stick, let go.</div>
-    <div><b class="px">Menu</b>Pause, settings, the Roll, the Voyage Book, credits.</div>
-    <div><b class="px">Keyboard</b>Arrows move, Space jumps, Z hand, X voice, L power, C menu.</div>
-    <div><b class="px">Gamepad</b>Left stick and the four face buttons, the same way.</div>
+    <div><b class="px">A</b>Talk, look, pick up, use. In a fight, a quick cut. Three in a row make a chain.</div>
+    <div><b class="px">X</b>The next thing in your hands. In a fight, the heavy blow. Hold it to break a shield; down and X lifts a man off his feet.</div>
+    <div><b class="px">B</b>In a fight, the shield. Hold it to block, tap it as the blow lands to throw him open.</div>
+    <div><b class="px">Y</b>Use what you are holding. In a fight, the roll.</div>
+    <div><b class="px">Special</b>A fifth button that appears in a fight: the shield charge, the spear lunge, the step behind him. With Kleos full, a god's favour.</div>
+    <div><b class="px">Keyboard</b>Arrows or WASD move, Shift walks, Z talks and uses, 1 to 5 choose what you hold, Space crouches in Troy. In a fight: Z cut, X heavy, C shield, Space roll, V special. P pause, T The Tale, Tab Where now?</div>
+    <div><b class="px">Gamepad</b>Left stick and the four face buttons, the same way. A shoulder button is the special, Start pauses, Back is Where now?</div>
   </div>
-  <p class="howto" style="margin-top:14px">Settings: stick size, left-handed swap, button opacity, text size, text speed, read aloud, less motion, music and sound levels, challenge (Gentle, Standard, Bold).</p>
+  <p class="howto" style="margin-top:14px">Settings: stick size, left-handed, button opacity, text size, text speed, read aloud, captions, mono sound, less motion, vibration, picture quality, music and sound levels, challenge (Gentle, Standard, Bold). If the game runs slowly, turn picture quality down.</p>
 </section>
 
 <section id="chapters">
-  <div class="eyebrow px">04 · The four chapters</div>
+  <div class="eyebrow px">04 · The places</div>
   <h2 class="px">In the order Homer tells them</h2>
   <div class="chapters">
-    <figure class="ch"><img src="img/horse.jpg" alt="The sack of Troy at night: Odysseus cracks a Trojan shield in the street while his men hold the edges, stars over the burning city" width="1280" height="720" loading="lazy">
-      <div class="body"><div class="n px">I · Troy</div><h3>The Horse and the sack</h3><p>Keep thirty men silent while Troy hauls you through its own gate. Then drop into the dark streets and fight your way to the house of Deiphobus, with Menelaus at your side.</p><div class="verb">Hush, slide, strike, guard, shove. The chapter that teaches you everything. About 23 minutes.</div></div></figure>
-    <figure class="ch"><img src="img/ismaros.jpg" alt="On the sand at Ismaros: Odysseus raises his shield as the Ciconian captain swings his spear overhand, the crews watching from both ends" width="1280" height="720" loading="lazy">
-      <div class="body"><div class="n px">II · Ismaros</div><h3>The ships at Ismaros</h3><p>The first landfall, the first plunder, the first bad decision. Hold the beach till the horns, take up your own bow from Troy, face the Ciconian captain, and learn what staying for the wine costs.</p><div class="verb">Run, leap, the bow, the captain. An action level. About 15 minutes.</div></div></figure>
-    <figure class="ch"><img src="img/lotus.jpg" alt="The Lotus Shore: Odysseus carries a scout back through the pink haze while another stands dazed on the cliff" width="1280" height="720" loading="lazy">
-      <div class="body"><div class="n px">III · The Lotus Shore</div><h3>The sweet hollows</h3><p>Three men went to ask who lives here and did not come back. Go in after them through the haze, and carry each one home before the flower takes you too.</p><div class="verb">Carry, duck, hop, hush. A rescue in four parts. About 14 minutes.</div></div></figure>
-    <figure class="ch"><img src="img/cyclops.jpg" alt="In the Cyclops' cave: Odysseus drives the glowing stake toward the sleeping giant's eye, the cheeses stacked beside him" width="1280" height="720" loading="lazy">
-      <div class="body"><div class="n px">IV · The Cyclops' Cave</div><h3>The giant's house</h3><p>A cave full of cheese and a door nobody can move. Work by day, hide by night, sharpen the stake, learn his snore, and ride out under the ram with a name he will never forget.</p><div class="verb">Craft, hide, the count, the ride. The Book's boss in three phases. About 26 minutes.</div></div></figure>
+    <figure class="ch"><img src="img/troy.jpg" alt="Troy at night: Odysseus and Menelaus in a dark street lit by a single torch, a Trojan guard's lamp sweeping the stones; Menelaus says he knows the door of Deiphobus" width="1280" height="720" loading="lazy">
+      <div class="body"><div class="n px">I · Troy</div><h3>The Horse, and Troy at night</h3><p>Thirty men inside the horse, and not one of them may cough. Then the drop into the streets with Menelaus. Crouch in the dark while the guards' lamps go past, or fight them, and find the house of Deiphobus.</p><div class="verb">Hush, crouch, hide, fight.</div></div></figure>
+    <figure class="ch"><img src="img/camp.jpg" alt="The Greek camp on the beach at Troy in the afternoon: black ships drawn up on the sand, men standing about, a bronze marker over the man Odysseus is looking for" width="1280" height="720" loading="lazy">
+      <div class="body"><div class="n px">II · The camp at Troy</div><h3>The beach, the morning after</h3><p>The city has fallen and your men are scattered across the camp. Find them, talk to them, get them to the kings' assembly by sunset. Lykon spars with you on the sand, and that is where you learn to fight. Then Tenedos, the count of the ships, and the sea.</p><div class="verb">Walk, talk, gather, the first bout.</div></div></figure>
+    <figure class="ch"><img src="img/ismaros.jpg" alt="On the beach at Ismaros: Odysseus with his round shield takes a blow from the Ciconian captain in his crested helmet, the crews watching between two black ships" width="1280" height="720" loading="lazy">
+      <div class="body"><div class="n px">III · Ismaros</div><h3>The town of the Cicones</h3><p>The first landfall and the first bad decision. The town falls, the wine comes out, and the men will not leave the beach. At dawn the Cicones come back with their neighbours, and you hold the line by the ships until they can be launched.</p><div class="verb">The raid, the night, the battle at dawn.</div></div></figure>
+    <figure class="ch"><img src="img/lotus.jpg" alt="The Lotus Shore at noon: pale pink sand, a pool and a woven hut, men wandering among the dunes while the ships wait behind" width="1280" height="720" loading="lazy">
+      <div class="body"><div class="n px">IV · The Lotus Shore</div><h3>The sweet hollows</h3><p>Nine days of storm, and on the tenth a quiet shore. Your scouts went to ask who lives here and did not come back. Go in after them and drag them to the ships. It is a shove, not a fight: they are your own men.</p><div class="verb">Search, haul, do not eat.</div></div></figure>
+    <figure class="ch"><img src="img/goat.jpg" alt="Goat Island in the morning: the ships drawn up, wine jars on the sand, Eurylochus telling Odysseus to take the bow because the goats will not let him near with a spear" width="1280" height="720" loading="lazy">
+      <div class="body"><div class="n px">V · Goat Island</div><h3>The morning after the fog</h3><p>You row into an island in a fog you cannot see through. In the morning there are wild goats everywhere and nobody to own them. Nine goats a ship, ten for yours. Across the water, smoke, and the sound of sheep.</p><div class="verb">Hunt, feast, look across.</div></div></figure>
+    <figure class="ch"><img src="img/cyclops.jpg" alt="Inside the Cyclops' cave: Odysseus and his men in a shaft of light by the fire, cheeses stacked on racks, pens for the lambs" width="1280" height="720" loading="lazy">
+      <div class="body"><div class="n px">VI · The Cyclops' Cave</div><h3>The giant's house</h3><p>A cave full of cheese and nobody home. Then he comes home. Sharpen the stake while he is out with his flock. When he comes back, give him the wine and tell him your name is Nobody. When he sleeps, the stake. In the morning, out under his rams.</p><div class="verb">Look, wait, the wine, the stake, the rams.</div></div></figure>
   </div>
 </section>
 
@@ -185,31 +189,31 @@ footer .px{color:var(--mist);font-size:12px}
   <div class="eyebrow px">05 · Inside Book One</div>
   <h2 class="px">What you are getting</h2>
   <div class="facts">
-    <div class="fact"><span class="px">Length</span>About eighty minutes at a player's pace: four chapters of side-view levels, with the voyage and the hubs between them.</div>
-    <div class="fact"><span class="px">The source</span>Homer's <i>Odyssey</i>, Books 9 and 12, from the Greek with Murray and Butler open beside it. Nothing from any film.</div>
+    <div class="fact"><span class="px">The look</span>Pixel-art people in small 3D worlds, with real shadows, the time of day, firelight, haze and depth. You walk them freely.</div>
+    <div class="fact"><span class="px">The source</span>Homer's <i>Odyssey</i>, mostly Books 8 and 9, from the Greek with Murray and Butler open beside it. Nothing from any film.</div>
     <div class="fact"><span class="px">Your men</span>Six hundred names on twelve ships. The ones you lose stay lost; the Roll remembers them.</div>
-    <div class="fact"><span class="px">The economy</span>Bronze, cups, tripods, cloaks and wine, won in play and spent on offerings and gifts. Nothing is bought with real money, ever.</div>
-    <div class="fact"><span class="px">The relics</span>Each ship's crew holds a relic for the one who earns their trust. The Swallow's bowstring is the first. Twelve of them make something, in Book Four.</div>
-    <div class="fact"><span class="px">The fights</span>Fought hand to hand, as they happen. Every soldier shows what he is about to do: strike first, raise your shield, or shove. Break his footing and he staggers. Fill KLEOS, the glory the bards sing, and one blow finishes him.</div>
-    <div class="fact"><span class="px">Your wits</span>METIS is Odysseus' cunning. Spend it to feint, to read a rival, to bargain with a god. Rest to win it back.</div>
-    <div class="fact"><span class="px">Choices</span>At each landfall Homer's question is yours: sacrifice before you sail or put out at once, who goes ashore, whether to go back for the man who will not come. The voyage remembers.</div>
-    <div class="fact"><span class="px">The gods</span>Athena, Poseidon, Apollo and Hermes answer at the torches, and not always kindly. Athena watches whether you honour her. Poseidon does not forget his son. Your crew mutters when you push them too far.</div>
-    <div class="fact"><span class="px">Sound</span>Fourteen songs, the wind and the sea under them, every effect made on your device as you play.</div>
-    <div class="fact"><span class="px">Tech</span>320 × 180 pixels, plain code, one file, no download, works offline. Phone, tablet, desktop, gamepad.</div>
-    <div class="fact"><span class="px">Made by</span>People and AI together, under one person's eye, at AZTMM.</div>
+    <div class="fact"><span class="px">The fights</span>Real time, one man at a time. Chain your cuts, read the wind-up, block or parry, roll the sweeps and grabs, lift a man and hit him again in the air. Beaten men are knocked down and thrown, never wounded.</div>
+    <div class="fact"><span class="px">Kleos</span>Glory, the thing the bards sing. It fills when you fight well, and when it is full it buys one blow from a god.</div>
+    <div class="fact"><span class="px">Metis</span>Odysseus' cunning. You spend it on tricks and the right words, and win it back at camp, telling your own story by the fire.</div>
+    <div class="fact"><span class="px">The camp</span>Between landfalls the crew eats, makes an offering, mends the ship, fishes, plays knucklebones and tells stories. A man who tells you his story trusts you more.</div>
+    <div class="fact"><span class="px">Choices</span>At each landfall Homer's question is yours to answer, and the voyage remembers what you chose.</div>
+    <div class="fact"><span class="px">The gods</span>Seen only by their signs, never as people. Athena watches whether you honour her. Poseidon does not forget his son. The crew mutters when you push them too far.</div>
+    <div class="fact"><span class="px">The economy</span>Bronze, cups, wine and cloaks, picked up as you go and spent on offerings and gifts. Nothing is bought with real money, ever.</div>
+    <div class="fact"><span class="px">Sound</span>The music and the sounds are made on your device as you play, with the wind and the sea under them. Captions are in Settings.</div>
+    <div class="fact"><span class="px">Tech</span>One file, no download, works offline. Phone, tablet or desktop; touch, keyboard or gamepad. It needs a browser from the last few years.</div>
   </div>
 </section>
 
 <section id="watch">
   <div class="eyebrow px">06 · Watch</div>
-  <h2 class="px">The trailer: twenty seconds of real play</h2>
+  <h2 class="px">The trailer: ten seconds of a fight</h2>
   <div class="film">
-    <video controls playsinline preload="metadata" poster="/video/v21.jpg" width="1080" height="1920">
-      <source src="book1_pov.mp4" type="video/mp4">
+    <video controls muted playsinline preload="metadata" poster="img/fight.jpg" width="960" height="540">
+      <source src="fight.mp4" type="video/mp4">
     </video>
     <div>
-      <p>Cut from the current build, not staged: a shield cracking at Troy, falling stars over the burning city, a fight won with one last blow, a choice at the gate and the stake in the giant's cave, with the score and the game's own sounds.</p>
-      <p class="howto">The trailer is the one thing from the beta you may share as is: <a href="book1_pov.mp4" download>vertical (9:16)</a> for TikTok, Reels, Shorts and Stories. Everything else in the Build stays between us until release.</p>
+      <p>Recorded from the current build, not staged: Odysseus and the Ciconian captain on the beach at Ismaros, the crews' ships behind them. Cuts, a shield, a chain of three, and Kleos filling at the bottom left. The clip has no sound.</p>
+      <p class="howto">The trailer is the one thing from the beta you may share as is: <a href="fight.mp4" download>landscape (16:9)</a>, post it wherever you like. Everything else in the Build stays between us until release.</p>
     </div>
   </div>
 </section>
@@ -222,7 +226,7 @@ footer .px{color:var(--mist);font-size:12px}
     <div class="card"><h3 class="px">Share it</h3><p>Send the link to one person who would like it, or post the clip above. A small studio lives on word of mouth, not ads.</p></div>
     <div class="card"><h3 class="px">Follow the voyage</h3><p>Books Two, Three and Four are coming: the Laestrygonians and the stars, Circe, the dead, the Sirens, Scylla, and the hall at Ithaca. Write to us and we will tell you when each one is out.</p></div>
   </div>
-  <p class="howto" style="margin-top:16px"><a href="/game/book-1/agreement.html">Read the full tester agreement</a>, or <a href="#" onclick="NB_GATE.reset();return false">sign it again</a>. Beta notes. Known: held upright, a phone shows the game small, so turn it sideways; the small words in the fight bar are hard to read on a phone. Your saves live only on this device.</p>
+  <p class="howto" style="margin-top:16px"><a href="/game/book-1/agreement.html">Read the full tester agreement</a>, or <a href="#" onclick="NB_GATE.reset();return false">sign it again</a>. Beta notes. Known: held upright, a phone shows the game small, so turn it sideways. The 3D asks more of a phone than the old build did; if it stutters, lower picture quality in Settings. Your saves live only on this device.</p>
 </section>
 
 </main>

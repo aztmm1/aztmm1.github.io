@@ -33,8 +33,10 @@ http://scripts.sil.org/OFL
 ======================================================================
 SOUND IN LEA
 ======================================================================
-Lea's music and sounds are original, played on recorded instruments from VS Chamber Orchestra 2: Community Edition
-by Versilian Studios, released under CC0 1.0 (public domain). The pipe organ was sampled by Simon Dalzell of Ivy Audio.
+Lea's music and sounds are original. The orchestra, the pipe organ, the concert harp and the upright piano are played on
+recorded instruments from VS Chamber Orchestra 2: Community Edition by Versilian Studios, released under CC0 1.0
+(public domain). The pipe organ was sampled by Simon Dalzell of Ivy Audio. The sitar, the koto, the nylon guitar, the
+santoor, the kalimba, the tabla, the shamisen and the handpan are modelled in code and use no recordings.
 
 ======================================================================
 BIG SHOULDERS DISPLAY

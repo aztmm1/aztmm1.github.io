@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emberhold · tester build</title>
+<meta name="description" content="Emberhold is a story adventure in real 3D. This is the page for invited testers: sign the tester agreement, then play the first chapter, The Warm Court.">
+<meta property="og:title" content="Emberhold · tester build">
+<meta property="og:description" content="Emberhold is a story adventure in real 3D. This is the page for invited testers: sign the tester agreement, then play the first chapter, The Warm Court.">
+<meta property="og:image" content="https://aztmm.com/media/emberhold/key-yard.jpg">
+<meta property="og:url" content="https://aztmm.com/game/emberhold/">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#14181d">
+<meta name="robots" content="noindex">
+<style>:root{--night:#14181d;--slate:#1b2026;--panel:#222831;--rule:#363e48;--ink:#efe6d6;--mist:#c3bba9;--dim:#9a9283;--ember:#c4404a;--ember2:#d9535d;--flame:#e8883a;--glow:#f0a45a}
+@font-face{font-family:'Crimson Pro';src:url(../../assets/fonts/crimson.woff2) format('woff2');font-weight:200 900;font-display:swap}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+html,body{margin:0;background:var(--night);color:var(--ink)}
+body{font:19px/1.55 'Crimson Pro',Georgia,'Times New Roman',serif;-webkit-font-smoothing:antialiased}
+a{color:var(--glow)}
+a:focus-visible,button:focus-visible{outline:2px solid var(--flame);outline-offset:3px}
+.wrap{max-width:980px;margin:0 auto;padding:0 16px}
+nav.top{position:sticky;top:0;z-index:5;background:rgba(20,24,29,.93);backdrop-filter:blur(6px);border-bottom:1px solid var(--rule)}
+nav.top .wrap{display:flex;gap:20px;align-items:center;height:54px;overflow-x:auto;white-space:nowrap}
+nav.top a{color:var(--mist);text-decoration:none;font-size:17px;font-weight:500}
+nav.top a:hover{color:var(--glow)}
+nav.top .brand{color:var(--ink);font-weight:700;font-size:22px;letter-spacing:.01em;margin-right:auto;display:flex;align-items:center;gap:9px}
+nav.top .brand:before{content:"";width:9px;height:9px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#ffd08a,var(--flame) 55%,var(--ember));box-shadow:0 0 10px 2px rgba(232,136,58,.55)}
+nav.top a.go{background:var(--ember);color:#fff4ec;padding:6px 14px;border-radius:2px;font-weight:700}
+nav.top a.go:hover{background:var(--ember2);color:#fff4ec}
+.rule{height:3px;background:linear-gradient(90deg,var(--ember),var(--flame) 45%,transparent 90%)}
+h2{font-size:clamp(28px,5.4vw,40px);line-height:1.1;font-weight:600;letter-spacing:-.01em;margin:0 0 12px;color:var(--ink)}
+h3{font-size:21px;font-weight:700;color:var(--glow);margin:22px 0 4px}
+p,li{color:var(--mist)}
+b{color:var(--ink)}
+p{max-width:40em}
+footer{border-top:1px solid var(--rule);margin-top:40px;background:var(--slate)}
+footer .wrap{padding:22px 16px 34px;color:var(--dim);font-size:16px}
+footer p{margin:4px 0;max-width:none}
+footer a{color:var(--mist)}
+
+.hero{position:relative;min-height:min(86vh,760px);display:flex;align-items:flex-end;background:#14181d url(../../media/emberhold/key-yard.jpg) 62% center/cover no-repeat;border-bottom:1px solid var(--rule)}
+.hero:before{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(20,24,29,.98) 0%,rgba(20,24,29,.82) 38%,rgba(20,24,29,.25) 75%,rgba(20,24,29,.45) 100%),linear-gradient(90deg,rgba(20,24,29,.7),transparent 70%)}
+.hero .wrap{position:relative;padding-top:120px;padding-bottom:36px;width:100%}
+.kicker{color:var(--flame);font-size:20px;font-weight:600;margin:0 0 4px}
+h1{margin:0;font-size:clamp(64px,19vw,150px);line-height:.92;font-weight:600;letter-spacing:-.02em;color:var(--ink);text-shadow:0 3px 24px rgba(0,0,0,.55)}
+.lede{max-width:23em;margin:18px 0 0;font-size:clamp(23px,4.6vw,30px);line-height:1.25;color:var(--ink)}
+.cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:26px}
+.btn{display:inline-block;padding:13px 24px;font:700 20px 'Crimson Pro',Georgia,serif;text-decoration:none;border-radius:2px;border:1px solid var(--ember)}
+.btn.play{background:var(--ember);color:#fff4ec}.btn.play:hover{background:var(--ember2)}
+.btn.ghost{background:rgba(20,24,29,.5);color:var(--ink);border-color:#58626e}.btn.ghost:hover{border-color:var(--flame);color:var(--glow)}
+.fine{margin:16px 0 0;max-width:34em;font-size:17px;color:var(--mist)}
+section{padding:46px 0 6px}
+.eyebrow{color:var(--flame);font-weight:600;font-size:18px;margin:0 0 4px}
+.big{font-size:23px;line-height:1.4;color:var(--ink);max-width:30em}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);border:1px solid var(--rule);margin:26px 0 4px;max-width:640px}
+.facts div{background:var(--slate);padding:12px 14px}
+.facts dt{font-size:15px;color:var(--dim);margin:0}.facts dd{margin:0;font-size:20px;font-weight:600;color:var(--ink)}
+.two{display:grid;gap:18px;margin-top:20px}
+.card{background:var(--panel);border:1px solid var(--rule);border-top:3px solid var(--ember);padding:16px 20px 18px}
+.card h3{margin:0 0 6px;font-size:22px}
+.card p,.card li{font-size:18px;max-width:none}
+.card ul{margin:6px 0 0;padding-left:20px}
+.keys b{display:inline-block;min-width:1.6em;text-align:center;padding:0 6px;margin-right:2px;border:1px solid #58626e;border-bottom-width:2px;border-radius:3px;background:#161b21;font-size:16px;color:var(--glow);font-weight:600}
+.strip{display:grid;gap:10px;margin-top:26px}
+.strip img{width:100%;height:auto;display:block;border:1px solid var(--rule)}
+.steps{counter-reset:s;list-style:none;padding:0;margin:14px 0 0;max-width:40em}
+.steps li{counter-increment:s;position:relative;padding:0 0 14px 50px;font-size:19px}
+.steps li:before{content:counter(s);position:absolute;left:0;top:0;width:34px;height:34px;border-radius:50%;background:var(--panel);border:2px solid var(--flame);color:var(--glow);font-weight:700;font-size:19px;display:flex;align-items:center;justify-content:center}
+.sign{margin-top:26px;padding:18px 20px;background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--flame);max-width:44em}
+.sign p{margin:0 0 8px}
+@media (min-width:760px){.two{grid-template-columns:1fr 1fr}.strip{grid-template-columns:1fr 1fr 1fr}.hero .wrap{padding-bottom:56px}}
+</style>
+</head>
+<body>
+<script src="gate.js"></script><script>EMB_GATE.require(function () { if (/[?&]from=play/.test(location.search)) location.href = 'play.html'; });</script>
+<nav class="top"><div class="wrap">
+  <a class="brand" href="index.html">Emberhold</a>
+  <a href="index.html#play">Tester page</a>
+  <a href="agreement.html">Agreement</a>
+  <a href="about.html">About the game</a>
+  <a href="../../terms/index.html">Terms</a>
+  <a href="../../privacy/index.html">Privacy</a>
+</div></nav>
+<header class="hero" id="top"><div class="wrap">
+  <p class="kicker">An AZTMM game · tester build</p>
+  <h1>Emberhold</h1>
+  <p class="lede">A boy carries a fire that is burning him out, for a creature that trusted him.</p>
+  <div class="cta">
+    <a class="btn play" href="play.html">Play the first chapter</a>
+    <a class="btn ghost" href="agreement.html">Read the agreement</a>
+  </div>
+  <p class="fine">For invited testers: sign the tester agreement, then play. You sign once on each device.</p>
+</div></header>
+<div class="rule"></div>
+<main class="wrap" id="play">
+
+<section>
+  <p class="eyebrow">What you are testing</p>
+  <h2>The Warm Court</h2>
+  <p class="big">The first chapter of Emberhold, from before light to the wall top. You play Robin, fifteen, who rakes the ash in a castle kitchen and says good morning every day to something asleep under the yard.</p>
+  <p>It is one castle yard, ten beats and about ten minutes, in real 3D, on a PC or an upright phone. It is unfinished, and the build changes between visits, so a fresh look is always worth it.</p>
+  <dl class="facts">
+    <div><dt>Chapter</dt><dd>The Warm Court</dd></div>
+    <div><dt>Length</dt><dd>About ten minutes</dd></div>
+    <div><dt>Play on</dt><dd>Browser, PC or phone</dd></div>
+    <div><dt>Ages</dt><dd>13 and up</dd></div>
+  </dl>
+  <div class="strip">
+    <img src="../../media/emberhold/reel-run.jpg" width="1280" height="720" loading="lazy" alt="Robin runs across the cobbled yard with his shield on his arm, a log on a stand ahead of him and the stone wall beyond.">
+    <img src="../../media/emberhold/reel-gallery.jpg" width="1280" height="720" loading="lazy" alt="Robin stands in the yard with his arms out, balancing, the stone wall and green hills behind him.">
+    <img src="../../media/emberhold/reel-east.jpg" width="1280" height="720" loading="lazy" alt="Robin runs along the timber walkway on the wall, looking out over the open valley.">
+  </div>
+</section>
+
+<section>
+  <p class="eyebrow">How to play</p>
+  <h2>Learned as you go</h2>
+  <div class="two">
+    <div class="card keys">
+      <h3>On a computer</h3>
+      <ul>
+        <li><b>W</b><b>A</b><b>S</b><b>D</b> move, and the mouse looks.</li>
+        <li><b>Z</b> <b>Space</b> <b>Enter</b> <b>E</b> are context or attack. Hold for the sweep.</li>
+        <li><b>X</b> rolls. <b>C</b> lets the Heat out.</li>
+        <li>Hold <b>Shift</b> or <b>V</b> to guard. <b>Esc</b> or <b>M</b> opens the menu.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>On a phone or a gamepad</h3>
+      <ul>
+        <li>Hold the phone upright. Your left thumb moves, your right thumb looks.</li>
+        <li>A gamepad works too: the left stick moves, A is context or attack, B is the dodge roll.</li>
+        <li>Use a recent browser with WebGL. The first load is a large file, so Wi-Fi is kinder.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <p class="eyebrow">What we ask of you</p>
+  <h2>Play it once, then tell us</h2>
+  <ol class="steps">
+    <li><b>Sign the agreement</b> the first time you press play. It takes a minute. The full text is on its own page if you want it first.</li>
+    <li><b>Play the chapter through,</b> and stop whenever you like. Where you stopped is useful to us.</li>
+    <li><b>Write to <a href="mailto:game@aztmm.com">game@aztmm.com</a></b> with what annoyed you, what you could not work out, and what broke. Say which phone or computer and which browser you used.</li>
+  </ol>
+  <div class="sign">
+    <p><b>Keep it to yourself.</b> Until Emberhold is released, please don&rsquo;t share the link, or stream, record, screenshot or post what is inside. You may say you are a tester. Screenshots sent only to us are welcome.</p>
+    <p><a href="agreement.html">Read the full tester agreement</a>, or <a href="#" onclick="EMB_GATE.reset();return false">sign it again</a>.</p>
+  </div>
+</section>
+
+</main>
+<footer><div class="wrap">
+  <p>An AZTMM game. &copy; 2026 AZTMM HLDGS LLC.</p>
+  <p>Emberhold&trade; and AZTMM&trade; are trademarks of AZTMM HLDGS LLC. Questions to <a href="mailto:game@aztmm.com">game@aztmm.com</a>.</p>
+  <p><a href="../../index.html">AZTMM Gaming Labs</a> &middot; <a href="../../terms/index.html">Terms</a> &middot; <a href="../../privacy/index.html">Privacy</a> &middot; Built using Claude.</p>
+</div></footer>
+</body>
+</html>

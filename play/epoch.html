@@ -1,0 +1,2939 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1a1612">
+<title>Epoch</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #1a1612; height: 100%; overflow: hidden; overscroll-behavior: none; -webkit-user-select: none; user-select: none; }
+  canvas { display: block; touch-action: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+// Epoch. An AZTMM game. (c) 2026 AZTMM HLDGS LLC.
+// 01_cards.js: civilisations, cards, decks. Every number here is tuning.
+// Field units: y runs 0 (your king tower) to 1 (theirs). Speeds in field-lengths per second. Ranges in field units.
+const RB = {};
+
+const CIVS = {
+  rome:     { name: 'Rome', palette: { body: '#b3262e', dark: '#4e1015', cloth: '#c63a38', metal: '#b98a3e', flag: '#e0b04c' },
+              rule: 'tortoise', ruleName: 'Tortoise', ruleText: 'Shields standing next to each other take 30% less damage.',
+              hero: 'rome_centurion', spell: 'rome_pilum', heroMove: 'Testudo', epithet: 'The Legions',
+              blurb: 'Drilled ranks and iron patience. Keep your shields shoulder to shoulder.' },
+  vikings:  { name: 'Vikings', palette: { body: '#2f6f8f', dark: '#14181d', cloth: '#3f86a8', metal: '#8d949c', flag: '#1b1d22' },
+              rule: 'moatrush', ruleName: 'Sea legs', ruleText: 'Units move 40% faster once they have crossed the moat.',
+              hero: 'vikings_jarl', spell: 'vikings_raven', heroMove: 'Berserk', epithet: 'The Raiders',
+              blurb: 'Slow to leave the shore, hard to stop once over the water.' },
+  marathas: { name: 'Marathas', palette: { body: '#f08a1c', dark: '#6b3d0c', cloth: '#f29a2e', metal: '#9aa0a6', flag: '#c9791a' },
+              rule: 'hillcraft', ruleName: 'Hill craft', ruleText: 'Cards cost 1 less when played in the back third of your own half.',
+              hero: 'marathas_raje', spell: 'marathas_ghorpad', heroMove: 'Night raid', epithet: 'The Hill Forts',
+              blurb: 'Fight from the fort. Cheap and quick when you stay close to home.' },
+  aztecs:   { name: 'Aztecs', palette: { body: '#2f9a72', dark: '#0f3f30', cloth: '#2bb7b0', metal: '#c8b27a', flag: '#c4282e' },
+              rule: 'refund', ruleName: 'Blood price', ruleText: 'Every enemy unit felled gives back 1 energy.',
+              hero: 'aztecs_eagleknight', spell: 'aztecs_flowerwar', heroMove: 'Sky fall', epithet: 'The Causeway Kings',
+              blurb: 'Every kill pays for the next card, so keep fighting.' },
+  samurai:  { name: 'Samurai', palette: { body: '#2c3a7a', dark: '#141a3c', cloth: '#a8222a', metal: '#cfd3d8', flag: '#f2eee4' },
+              rule: 'crit', ruleName: 'One cut', ruleText: 'Single units deal a double-damage critical hit on every fourth strike.',
+              hero: 'samurai_ronin', spell: 'samurai_kiai', heroMove: 'Duel', epithet: 'The Castle Lords',
+              blurb: 'A few good fighters beat a crowd. Let them find the opening.' },
+  egypt:    { name: 'Egypt', palette: { body: '#d6b25a', dark: '#6a5120', cloth: '#26479e', metal: '#e9d38a', flag: '#26479e' },
+              rule: 'repair', ruleName: 'Eternal stone', ruleText: 'Towers have 20% more health and mend 1% a second when no enemy is near.',
+              hero: 'egypt_champion', spell: 'egypt_flood', heroMove: 'Sandstorm', epithet: 'The Temple Walls',
+              blurb: 'Outlast them. The walls were old before anyone else arrived.' }
+};
+
+// Role baselines. A card overrides only what makes it different.
+const BASE = {
+  shield: { cost: 3, count: 2, hp: 170, dmg: 20, hitEvery: 1.2, speed: 0.10, range: 0.045, targets: 'any' },
+  blade:  { cost: 3, count: 1, hp: 290, dmg: 52, hitEvery: 1.0, speed: 0.15, range: 0.05,  targets: 'any' },
+  swarm:  { cost: 2, count: 3, hp: 52,  dmg: 17, hitEvery: 0.8, speed: 0.17, range: 0.04,  targets: 'any' },
+  bow:    { cost: 3, count: 2, hp: 58,  dmg: 26, hitEvery: 1.2, speed: 0.12, range: 0.19,  targets: 'any' },
+  horse:  { cost: 3, count: 1, hp: 210, dmg: 52, hitEvery: 1.1, speed: 0.25, range: 0.05,  targets: 'any' },
+  siege:  { cost: 4, count: 1, hp: 220, dmg: 100, hitEvery: 2.2, speed: 0.07, range: 0.30, targets: 'buildings' },
+  hero:   { cost: 5, count: 1, hp: 480, dmg: 68, hitEvery: 1.0, speed: 0.15, range: 0.05,  targets: 'any' },
+  spell:  { cost: 3, count: 0 }
+};
+
+// Balance scalars on hp and dmg per civ, found by node test/bot.js over all 30 ordered civ pairs. Change them there, not card by card.
+const TUNE = { rome: 0.99, vikings: 1.38, marathas: 0.77, aztecs: 0.88, samurai: 1.36, egypt: 1.34 };
+
+const CARDS = {};
+function def(civ, key, role, o) {
+  const id = civ + '_' + key;
+  const c = Object.assign({ id: id, civ: civ, role: role }, BASE[role], o);
+  if (role !== 'spell') { c.hp = Math.round(c.hp * TUNE[civ]); c.dmg = Math.round(c.dmg * TUNE[civ]); }
+  CARDS[id] = c;
+}
+
+// ---- Rome ----
+def('rome', 'legionary', 'shield', { name: 'Legionaries', hp: 185, dmg: 18,
+  blurb: 'Two heavy shields that lock together and shrug off the first blows.' });
+def('rome', 'gladiator', 'blade', { name: 'Gladiator', hp: 300, dmg: 50,
+  blurb: 'One man who has done this for a crowd, and does it well.' });
+def('rome', 'velites', 'swarm', { name: 'Velites', jav: 28,
+  blurb: 'Three skirmishers who throw a javelin the moment they meet something.' });
+def('rome', 'archers', 'bow', { name: 'Auxiliary archers',
+  blurb: 'Eastern bowmen hired by the legions. Good until someone reaches them.' });
+def('rome', 'equites', 'horse', { name: 'Equites', hp: 200,
+  blurb: 'Cavalry from the wings of the army, quick to run down archers.' });
+def('rome', 'ballista', 'siege', { name: 'Ballista', range: 0.32, dmg: 105,
+  blurb: 'A great bolt-thrower that out-reaches a tower and hates anything that gets close.' });
+def('rome', 'centurion', 'hero', { name: 'The Centurion', as: 'shield', hp: 520, dmg: 55, power: 'testudo',
+  blurb: 'He raises the shield and every Roman in the lane is untouchable for three seconds.' });
+def('rome', 'pilum', 'spell', { name: 'Pilum volley', cost: 3, dmg: 85, spellKind: 'aoe',
+  blurb: 'A cloud of heavy javelins comes down on everything in the lane.' });
+
+// ---- Vikings ----
+def('vikings', 'shieldwall', 'shield', { name: 'Shield wall', hp: 175,
+  blurb: 'Painted round shields in a line. Hard to dent, slow to get anywhere.' });
+def('vikings', 'berserker', 'blade', { name: 'Berserker', hp: 270, dmg: 55, rage: true,
+  blurb: 'The more he bleeds the faster he swings.' });
+def('vikings', 'raiders', 'swarm', { name: 'Raiders',
+  blurb: 'Three men with axes who came for the farm and stayed for the fight.' });
+def('vikings', 'bowmen', 'bow', { name: 'Bowmen',
+  blurb: 'Hunters from the fjords. They shoot first and run second.' });
+def('vikings', 'longship', 'horse', { name: 'Longship', cost: 4, hp: 200, dmg: 40, hitEvery: 1.0, speed: 0.30, range: 0.20, water: true,
+  blurb: 'It never leaves the moat, sails along it and fights whatever walks the banks.' });
+def('vikings', 'ram', 'siege', { name: 'Battering ram', hp: 300, dmg: 90, range: 0.05, speed: 0.08,
+  blurb: 'An oak trunk on wheels. It wants the tower and nothing else.' });
+def('vikings', 'jarl', 'hero', { name: 'The Jarl', as: 'blade', hp: 500, dmg: 66, power: 'berserk',
+  blurb: 'He howls and every Viking in the lane hits twice as hard for six seconds, at a price in blood.' });
+def('vikings', 'raven', 'spell', { name: "Raven's call", cost: 2, spellKind: 'slow',
+  blurb: 'Black wings over a lane. Everything the enemy has there slows down.' });
+
+// ---- Marathas ----
+def('marathas', 'shiledar', 'shield', { name: 'Shiledar', hp: 180, dmg: 20,
+  blurb: 'Soldiers with a round dhal and a curved talwar. They hold the line while the hills do the rest.' });
+def('marathas', 'dandpatta', 'blade', { name: 'Dandpatta', cleave: 0.06,
+  blurb: 'A gauntlet sword that cuts everyone standing next to the target.' });
+def('marathas', 'mavale', 'swarm', { name: 'Mavale',
+  blurb: 'Three hill men from the valleys, quick on their feet and used to being outnumbered.' });
+def('marathas', 'hetkari', 'bow', { name: 'Hetkari', range: 0.24, dmg: 30, hitEvery: 1.4, hp: 55,
+  blurb: 'Musketeers with a long reach and a slow reload.' });
+def('marathas', 'bargir', 'horse', { name: 'Bargir', charge: 2.0, hp: 200,
+  blurb: 'Light horse. After a good run the first blow lands twice as hard.' });
+def('marathas', 'rocketcart', 'siege', { name: 'Rocket cart', dmg: 85, hp: 190, range: 0.28, splash: 0.07,
+  blurb: 'Iron rockets on a cart. They scatter whoever stands near the tower they hit.' });
+def('marathas', 'raje', 'hero', { name: 'The Raje', as: 'blade', hp: 470, dmg: 66, power: 'nightraid',
+  blurb: 'Two Mavale appear behind the nearest enemy tower while the guards look the wrong way.' });
+def('marathas', 'ghorpad', 'spell', { name: 'Ghorpad', cost: 3, dmg: 300, spellKind: 'tower',
+  blurb: 'A monitor lizard climbs the wall in the night. The tower in that lane takes 300.' });
+
+// ---- Aztecs ----
+def('aztecs', 'jaguar', 'shield', { name: 'Jaguar warriors', hp: 175, dmg: 21,
+  blurb: 'Spotted pelts, wooden shields, and a very solid line.' });
+def('aztecs', 'eagle', 'blade', { name: 'Eagle warrior', hp: 250, dmg: 50, leap: 0.20,
+  blurb: 'He jumps the gap to his target and hits harder for it.' });
+def('aztecs', 'levies', 'swarm', { name: 'Levies',
+  blurb: 'Three young men with clubs and slings who go where they are told.' });
+def('aztecs', 'atlatl', 'bow', { name: 'Atlatl throwers',
+  blurb: 'Spear-throwers that send a dart a long way for very little cost.' });
+def('aztecs', 'runners', 'horse', { name: 'Runners', cost: 3, count: 2, hp: 85, dmg: 26, hitEvery: 0.9, speed: 0.38,
+  blurb: 'The fastest feet in the game, two of them, and nothing to protect them.' });
+def('aztecs', 'firebearers', 'siege', { name: 'Fire bearers', count: 2, cost: 3, hp: 80, dmg: 52, hitEvery: 1.4, speed: 0.22, range: 0.04,
+  blurb: 'Two torch carriers running at the tower to set it alight.' });
+def('aztecs', 'eagleknight', 'hero', { name: 'The Eagle Knight', as: 'horse', hp: 470, dmg: 62, power: 'skyfall',
+  blurb: 'He leaps the moat and lands hard enough to throw the enemy back.' });
+def('aztecs', 'flowerwar', 'spell', { name: 'Flower war', cost: 3, spellKind: 'chaos',
+  blurb: 'The enemy in that lane forgets who they came for and turns on each other for three seconds.' });
+
+// ---- Samurai ----
+def('samurai', 'ashigaru', 'shield', { name: 'Ashigaru spears', hp: 170, dmg: 21, range: 0.055,
+  blurb: 'Foot soldiers with long spears who keep an enemy at arm and a half.' });
+def('samurai', 'samurai', 'blade', { name: 'Samurai', hp: 290, dmg: 52,
+  blurb: 'A lone swordsman. Every fourth cut is twice as hard.' });
+def('samurai', 'peasants', 'swarm', { name: 'Peasant levy',
+  blurb: 'Three farmers with whatever the village could spare.' });
+def('samurai', 'archers', 'bow', { name: 'Ashigaru archers',
+  blurb: 'Archers in lacquered hats, shooting in volleys from behind the line.' });
+def('samurai', 'yabusame', 'horse', { name: 'Yabusame', cost: 4, hp: 200, dmg: 30, hitEvery: 1.1, speed: 0.24, range: 0.17, mobile: true,
+  blurb: 'A horse archer who keeps shooting while he rides.' });
+def('samurai', 'ozutsu', 'siege', { name: 'Ozutsu', hp: 190, dmg: 230, hitEvery: 3.2, range: 0.13,
+  blurb: 'A hand cannon the size of a drum. It must get close, and then it hits very hard.' });
+def('samurai', 'ronin', 'hero', { name: 'The Ronin', as: 'blade', hp: 440, dmg: 72, power: 'duel',
+  blurb: 'He picks the strongest enemy in the lane and no one else is allowed in until one of them falls.' });
+def('samurai', 'kiai', 'spell', { name: 'Kiai', cost: 2, spellKind: 'haste',
+  blurb: 'A shout from the line. Your fighters in the lane strike at once and swing faster for three seconds.' });
+
+// ---- Egypt ----
+def('egypt', 'shieldbearers', 'shield', { name: 'Shieldbearers', hp: 175,
+  blurb: 'Tall shields of ox hide, carried by men who guard a temple wall for a living.' });
+def('egypt', 'khopesh', 'blade', { name: 'Khopesh guard', hp: 300, dmg: 50,
+  blurb: 'A sickle sword that hooks the shield out of the way.' });
+def('egypt', 'levies', 'swarm', { name: 'Nile levy',
+  blurb: 'Three river farmers with sticks, sent in numbers.' });
+def('egypt', 'archers', 'bow', { name: 'Composite archers', range: 0.21,
+  blurb: 'Horn and sinew bows with a reach that surprises people.' });
+def('egypt', 'chariot', 'horse', { name: 'War chariot', cost: 4, hp: 240, dmg: 50, charge: 1.5, chargeSplash: 0.07,
+  blurb: 'Its first hit after a run throws the people next to the target around too.' });
+def('egypt', 'obeliskram', 'siege', { name: 'Obelisk ram', hp: 340, dmg: 95, range: 0.05, speed: 0.07,
+  blurb: 'A carved pillar of granite carried on logs. It goes through gates.' });
+def('egypt', 'champion', 'hero', { name: "The Pharaoh's Champion", as: 'blade', hp: 500, dmg: 66, power: 'sandstorm',
+  blurb: 'A wall of sand blinds the lane for four seconds. Enemy archers and towers cannot shoot.' });
+def('egypt', 'flood', 'spell', { name: 'Flood', cost: 3, spellKind: 'flood',
+  blurb: 'The river rises and both bridges are shut for four seconds.' });
+
+const ROLE_BEATS = { shield: ['blade', 'horse'], blade: ['swarm'], swarm: ['shield'], bow: ['blade', 'shield'], horse: ['bow', 'siege'], siege: [] };
+
+const DECKS = {};
+for (const civ in CIVS) {
+  DECKS[civ] = Object.keys(CARDS).filter(function (id) { return CARDS[id].civ === civ; });
+}
+
+const TOWER = { outer: { hp: 1400, dmg: 40, hitEvery: 0.8, range: 0.24 }, king: { hp: 2400, dmg: 55, hitEvery: 1.0, range: 0.26 } };
+const MATCH = { seconds: 180, overtime: 60, energyMax: 10, energyPerSec: 1.0, lateEnergyPerSec: 2.0, lateAt: 60, handSize: 4 };
+
+RB.CIVS = CIVS; RB.CARDS = CARDS; RB.ROLE_BEATS = ROLE_BEATS; RB.DECKS = DECKS; RB.TOWER = TOWER; RB.MATCH = MATCH;
+
+</script>
+<script>
+// Epoch. An AZTMM game. (c) 2026 AZTMM HLDGS LLC.
+// 02_rules.js: the match, engine-free. Field coordinates: x in [0,1] (left to right), y in [0,1] (your side 0, theirs 1).
+// Deterministic for a seed (M.rng only), so the headless bot and the page play the same match.
+
+function mulberry(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+const FIELD = {
+  riverY: 0.5, bridges: [0.22, 0.78], bridgeHalf: 0.06, band: 0.075,
+  towers: function (side) {
+    const y1 = side === 0 ? 0.17 : 0.83, y2 = side === 0 ? 0.07 : 0.93;
+    return [{ kind: 'outer', x: 0.22, y: y1 }, { kind: 'outer', x: 0.78, y: y1 }, { kind: 'king', x: 0.5, y: y2 }];
+  }
+};
+const MULT = 1.6;
+const LANE_X = [0.25, 0.75];
+function laneOf(x) { return x < 0.5 ? 0 : 1; }
+function enemyOf(side) { return 1 - side; }
+function dist(a, b) { const dx = a.x - b.x, dy = (a.y - b.y) * 1.6; return Math.sqrt(dx * dx + dy * dy); }
+function fightRole(x) { return x.kind ? 'tower' : (x.as || x.role); }
+
+function newMatch(opts) {
+  const o = opts || {};
+  const seed = o.seed || 1;
+  const rng = mulberry(seed);
+  const civs = [o.civ0 || o.faction0 || 'marathas', o.civ1 || o.faction1 || 'rome'];
+  const M = { t: 0, seed: seed, rng: rng, over: false, winner: -1, reason: '', sudden: false, events: [], units: [], towers: [], nextId: 1,
+              players: [], log: [], storms: [], flood: null, timeScale: 1 };
+  const decks = [o.deck0 || RB.DECKS[civs[0]], o.deck1 || RB.DECKS[civs[1]]];
+  for (let s = 0; s < 2; s++) {
+    const deck = decks[s].slice();
+    for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); const t = deck[i]; deck[i] = deck[j]; deck[j] = t; }
+    const P = { side: s, civ: civs[s], energy: 5, deck: deck, hand: deck.splice(0, RB.MATCH.handSize), next: null, towersLost: 0 };
+    P.next = P.deck[0];
+    M.players.push(P);
+    const hpMul = civs[s] === 'egypt' ? 1.2 : 1;
+    for (const t of FIELD.towers(s)) {
+      const hp = Math.round(RB.TOWER[t.kind].hp * hpMul);
+      M.towers.push({ id: M.nextId++, side: s, civ: civs[s], role: 'tower', kind: t.kind, x: t.x, y: t.y, hp: hp, maxHp: hp, cd: 0, alive: true, awake: t.kind !== 'king', rlast: -9 });
+    }
+  }
+  return M;
+}
+
+function say(M, text, side) { M.log.push({ t: M.t, text: text, side: side }); if (M.log.length > 40) M.log.shift(); }
+function event(M, e) { e.t = M.t; M.events.push(e); }
+function civrule(M, who, rule, x, y, throttle) {
+  if (throttle && M.t - (who.rlast || -9) < throttle) return;
+  who.rlast = M.t;
+  event(M, { kind: 'civrule', civ: who.civ, rule: rule, x: x, y: y, side: who.side });
+}
+
+function cardCost(M, side, id, y) {
+  const c = RB.CARDS[id]; let cost = c.cost;
+  if (M.players[side].civ === 'marathas' && y != null) {
+    const third = FIELD.riverY / 3;
+    if (side === 0 ? y < third : y > 1 - third) cost = Math.max(1, cost - 1);
+  }
+  return cost;
+}
+
+function canDeploy(M, side, x, y) {
+  if (y < 0.02 || y > 0.98 || x < 0.04 || x > 0.96) return false;
+  const own = side === 0 ? y < FIELD.riverY - 0.02 : y > FIELD.riverY + 0.02;
+  if (own) return true;
+  const lane = laneOf(x);
+  const t = M.towers.find(function (q) { return q.side === enemyOf(side) && q.kind === 'outer' && laneOf(q.x) === lane; });
+  if (t && !t.alive) return side === 0 ? y < t.y - 0.03 : y > t.y + 0.03;
+  return false;
+}
+
+function spawnUnit(M, side, card, x, y) {
+  const civ = M.players[side].civ;
+  const u = { id: M.nextId++, side: side, civ: civ, card: card.id, body: card.id, role: card.role, as: card.as || null, x: x, y: y,
+              hp: card.hp, maxHp: card.hp, dmg: card.dmg, hitEvery: card.hitEvery, cd: 0.3, speed: card.speed, range: card.range, targets: card.targets,
+              splash: card.splash || 0, charge: card.charge || 0, chargeSplash: card.chargeSplash || 0, cleave: card.cleave || 0, leap: card.leap || 0,
+              jav: card.jav || 0, rage: !!card.rage, water: !!card.water, mobile: !!card.mobile, solo: (card.count || 1) === 1,
+              ran: 0, chargeReady: false, alive: true, target: null, facing: side === 0 ? 1 : -1, born: M.t, buff: 0, bob: M.rng() * 6.28,
+              strikes: 0, crossed: side === 0 ? y >= FIELD.riverY : y <= FIELD.riverY, immune: 0, slow: 0, quick: 0, flower: 0, berserk: 0,
+              leapCd: 0, rt: 0, duel: null, nextMul: 1, rlast: -9, hero: card.role === 'hero' };
+  M.units.push(u);
+  return u;
+}
+
+function foesInLane(M, side, lane) {
+  return M.units.filter(function (u) { return u.alive && u.side !== side && laneOf(u.x) === lane && !u.duel; });
+}
+function friendsInLane(M, side, lane) {
+  return M.units.filter(function (u) { return u.alive && u.side === side && laneOf(u.x) === lane; });
+}
+
+function playCard(M, side, cardId, x, y) {
+  const P = M.players[side], card = RB.CARDS[cardId];
+  if (!card || M.over) return { ok: false, why: 'no card' };
+  const hi = P.hand.indexOf(cardId);
+  if (hi < 0) return { ok: false, why: 'not in hand' };
+  const cost = cardCost(M, side, cardId, y);
+  if (P.energy < cost) return { ok: false, why: 'energy' };
+  const lane = laneOf(x);
+  const disc = cost < card.cost;
+  if (card.role === 'spell') {
+    if (!castSpell(M, side, card, x, y, lane)) return { ok: false, why: 'no target in that lane' };
+  } else {
+    if (!canDeploy(M, side, x, y)) return { ok: false, why: 'not your ground' };
+    const n = card.count || 1, made = [];
+    for (let i = 0; i < n; i++) {
+      const ox = n === 1 ? 0 : (i - (n - 1) / 2) * 0.05, oy = n > 2 ? ((i % 2) - 0.5) * 0.03 : 0;
+      made.push(spawnUnit(M, side, card, Math.max(0.05, Math.min(0.95, x + ox)), y + oy));
+    }
+    event(M, { kind: 'deploy', x: x, y: y, side: side, card: cardId });
+    if (card.power) heroPower(M, side, card, made[0], lane);
+  }
+  if (disc) event(M, { kind: 'civrule', civ: 'marathas', rule: 'hillcraft', x: x, y: y, side: side });
+  P.energy -= cost;
+  P.hand.splice(hi, 1); P.hand.push(P.next); P.deck.push(cardId); P.next = P.deck.shift();
+  return { ok: true, cost: cost };
+}
+
+function heroPower(M, side, card, u, lane) {
+  const base = { kind: 'hero', move: card.power, card: card.id, x: u.x, y: u.y, side: side, lane: lane };
+  const dir = side === 0 ? 1 : -1;
+  if (card.power === 'testudo') {
+    for (const v of friendsInLane(M, side, lane)) v.immune = 3;
+    say(M, 'Testudo. The shields close.', side);
+  } else if (card.power === 'berserk') {
+    for (const v of friendsInLane(M, side, lane)) v.berserk = 6;
+    say(M, 'The Jarl roars. The lane goes berserk.', side);
+  } else if (card.power === 'nightraid') {
+    let T = M.towers.filter(function (q) { return q.side === enemyOf(side) && q.alive && laneOf(q.x) === lane && q.kind === 'outer'; })[0]
+      || M.towers.filter(function (q) { return q.side === enemyOf(side) && q.alive; })[0];
+    if (T) {
+      const mav = RB.CARDS.marathas_mavale;
+      for (let i = 0; i < 2; i++) {
+        const r = spawnUnit(M, side, mav, Math.max(0.05, Math.min(0.95, T.x + (i - 0.5) * 0.06)), Math.max(0.03, Math.min(0.97, T.y + dir * 0.06)));
+        r.crossed = true;
+      }
+      base.x = T.x; base.y = T.y;
+      say(M, 'The Raje\'s night raid: two Mavale behind the tower.', side);
+    }
+  } else if (card.power === 'skyfall') {
+    const lx = FIELD.bridges[lane], ly = FIELD.riverY + dir * 0.10;
+    base.fromX = u.x; base.fromY = u.y;
+    u.x = lx; u.y = ly; u.crossed = true; u.cd = 0.6;
+    base.x = lx; base.y = ly;
+    for (const v of M.units) {
+      if (!v.alive || v.side === side || v.duel) continue;
+      if (dist(u, v) < 0.20) { hit(M, u, v, 60); v.y = Math.max(0.03, Math.min(0.97, v.y + dir * 0.09)); }
+    }
+    say(M, 'The Eagle Knight falls from the sky.', side);
+  } else if (card.power === 'duel') {
+    let cands = foesInLane(M, side, lane);
+    if (!cands.length) cands = M.units.filter(function (v) { return v.alive && v.side !== side && !v.duel; });
+    cands.sort(function (a, b) { return b.hp - a.hp; });
+    const foe = cands[0];
+    if (foe) {
+      u.duel = foe; foe.duel = u;
+      u.x = Math.max(0.05, Math.min(0.95, foe.x - 0.04)); u.y = foe.y - dir * 0.0; u.crossed = foe.y > FIELD.riverY === (side === 0);
+      u.target = foe; foe.target = u;
+      base.foeCard = foe.card; base.x = foe.x; base.y = foe.y; base.locked = true;
+      say(M, 'The Ronin calls out the strongest foe in the lane.', side);
+    } else base.locked = false;
+  } else if (card.power === 'sandstorm') {
+    M.storms.push({ side: side, lane: lane, until: M.t + 4 });
+    say(M, 'A sandstorm blinds the lane.', side);
+  }
+  event(M, base);
+}
+
+function castSpell(M, side, card, x, y, lane) {
+  const pseudo = { side: side, civ: M.players[side].civ, role: 'spell', as: 'spell' };
+  const k = card.spellKind, ev = { kind: 'spell', card: card.id, x: x, y: y, side: side, lane: lane };
+  if (k === 'aoe') {
+    const foes = foesInLane(M, side, lane); if (!foes.length) return false;
+    for (const v of foes) hit(M, pseudo, v, card.dmg);
+  } else if (k === 'slow') {
+    const foes = foesInLane(M, side, lane); if (!foes.length) return false;
+    for (const v of foes) v.slow = 5;
+  } else if (k === 'tower') {
+    const T = M.towers.filter(function (q) { return q.side === enemyOf(side) && q.alive && q.kind === 'outer' && laneOf(q.x) === lane; })[0]
+      || M.towers.filter(function (q) { return q.side === enemyOf(side) && q.alive && q.kind === 'king'; })[0];
+    if (!T) return false;
+    ev.x = T.x; ev.y = T.y;
+    hit(M, pseudo, T, card.dmg);
+  } else if (k === 'chaos') {
+    const foes = foesInLane(M, side, lane); if (!foes.length) return false;
+    for (const v of foes) { v.flower = 3; v.target = null; v.rt = 0; }
+  } else if (k === 'haste') {
+    const fr = friendsInLane(M, side, lane); if (!fr.length) return false;
+    for (const v of fr) { v.cd = 0; v.quick = 3; }
+  } else if (k === 'flood') {
+    M.flood = { until: M.t + 4 };
+  } else return false;
+  event(M, ev);
+  say(M, card.name + '.', side);
+  return true;
+}
+
+function pickTarget(M, u) {
+  if (u.duel) return u.duel;
+  let best = null, bd = 1e9;
+  if (u.flower > 0) {
+    for (const v of M.units) { if (!v.alive || v === u || v.side !== u.side || v.duel) continue; const d = dist(u, v); if (d < bd) { bd = d; best = v; } }
+    if (best) return best;
+  }
+  if (u.targets !== 'buildings') for (const v of M.units) {
+    if (!v.alive || v.side === u.side || v.duel) continue;
+    const d = dist(u, v); if (d < bd) { bd = d; best = v; }
+  }
+  for (const t of M.towers) { if (!t.alive || t.side === u.side) continue; const d = dist(u, t) - 0.03; if (d < bd) { bd = d; best = t; } }
+  return best;
+}
+
+function blinded(M, side, x, king) {
+  for (const s of M.storms) if (s.until > M.t && s.side !== side && (king || laneOf(x) === s.lane)) return true;
+  return false;
+}
+
+function tortoiseNear(M, u) {
+  for (const v of M.units) if (v !== u && v.alive && v.side === u.side && fightRole(v) === 'shield' && Math.abs(v.x - u.x) < 0.07 && Math.abs(v.y - u.y) < 0.05) return true;
+  return false;
+}
+
+function hit(M, from, to, dmg, o) {
+  o = o || {};
+  if (!to.alive || to.immune > 0) return;
+  let mult = 1;
+  const fr = fightRole(from);
+  if (to.kind) { if (from.role === 'siege') mult = MULT; }
+  else {
+    const b = RB.ROLE_BEATS[fr];
+    if (b && b.indexOf(fightRole(to)) >= 0) mult = MULT;
+    else if (o.splash && to.role === 'swarm') mult = MULT;
+  }
+  dmg *= mult;
+  if (!to.kind && to.civ === 'rome' && fightRole(to) === 'shield' && tortoiseNear(M, to)) { dmg *= 0.7; civrule(M, to, 'tortoise', to.x, to.y, 1.2); }
+  to.hp -= dmg;
+  if (to.kind === 'king') to.awake = true;
+  event(M, { kind: 'hit', x: to.x, y: to.y, dmg: Math.round(dmg), side: from.side, tower: !!to.kind, role: from.role, crit: !!o.crit });
+  if (to.hp <= 0 && to.alive) {
+    to.hp = 0; to.alive = false;
+    if (to.kind) {
+      event(M, { kind: 'towerfall', tower: to.kind, x: to.x, y: to.y, side: to.side });
+      M.players[to.side].towersLost++;
+      for (const k of M.towers) if (k.side === to.side && k.kind === 'king') k.awake = true;
+      say(M, to.kind === 'king' ? 'The gate is broken.' : 'A tower falls.', from.side);
+      if (to.kind === 'king' || M.sudden) endMatch(M, from.side, to.kind === 'king' ? 'gate' : 'sudden');
+    } else {
+      to.died = M.t;
+      event(M, { kind: 'fall', card: to.card, x: to.x, y: to.y, side: to.side });
+      if (from.civ === 'aztecs' && from.side !== to.side) {
+        const P = M.players[from.side];
+        P.energy = Math.min(RB.MATCH.energyMax, P.energy + 1);
+        event(M, { kind: 'civrule', civ: 'aztecs', rule: 'refund', x: to.x, y: to.y, side: from.side });
+      }
+    }
+  }
+}
+
+function strike(M, u, T) {
+  const slow = u.rage ? 0.5 + 0.5 * (u.hp / u.maxHp) : 1;
+  u.cd = u.hitEvery * slow * (u.quick > 0 ? 0.6 : 1);
+  let dmg = u.dmg * u.nextMul, crit = false, charged = false;
+  u.nextMul = 1;
+  if (u.charge && u.chargeReady) { dmg *= u.charge; u.chargeReady = false; charged = true; event(M, { kind: 'charge', x: u.x, y: u.y, side: u.side }); }
+  if (u.civ === 'samurai' && u.solo) {
+    u.strikes++;
+    if (u.strikes % 4 === 0) { dmg *= 2; crit = true; civrule(M, u, 'crit', u.x, u.y, 0); }
+  }
+  if (u.berserk > 0) dmg *= 2;
+  if (u.jav) {
+    const j = u.jav; u.jav = 0;
+    event(M, { kind: 'shot', x: u.x, y: u.y, tx: T.x, ty: T.y, side: u.side });
+    hit(M, u, T, j);
+  }
+  if (u.range > 0.1) event(M, { kind: 'shot', x: u.x, y: u.y, tx: T.x, ty: T.y, side: u.side });
+  hit(M, u, T, dmg, { crit: crit });
+  if (u.cleave) for (const v of M.units) if (v.alive && v !== T && v.side !== u.side && !v.duel && dist(v, u) < u.cleave) hit(M, u, v, dmg * 0.8);
+  const sp = u.splash || (charged ? u.chargeSplash : 0);
+  if (sp) for (const v of M.units) if (v.alive && v !== T && v.side !== u.side && !v.duel && dist(v, T) < sp) hit(M, u, v, dmg * 0.6, { splash: true });
+}
+
+function stepWater(M, u, dt) {
+  const sp = u.speed * (u.slow > 0 ? 0.6 : 1) * dt;
+  const dy = FIELD.riverY - u.y;
+  if (Math.abs(dy) > 0.01) { u.y += Math.sign(dy) * Math.min(sp, Math.abs(dy)); u.crossed = true; return; }
+  u.y = FIELD.riverY; u.crossed = true;
+  let best = null, bd = 1e9;
+  for (const v of M.units) { if (!v.alive || v.side === u.side || v.duel || v.water) continue; const d = dist(u, v); if (d < bd) { bd = d; best = v; } }
+  if (best && bd <= u.range) { if (u.cd <= 0) strike(M, u, best); return; }
+  let tx = 0.5;
+  if (best && Math.abs(best.y - FIELD.riverY) < 0.3) tx = best.x;
+  else {
+    const a = foesInLane(M, u.side, 0).length, b = foesInLane(M, u.side, 1).length;
+    tx = a === b ? u.x : (a > b ? LANE_X[0] : LANE_X[1]);
+  }
+  const ddx = tx - u.x;
+  if (Math.abs(ddx) > 0.01) { u.x += Math.sign(ddx) * Math.min(sp, Math.abs(ddx)); u.facing = ddx > 0 ? 1 : -1; }
+}
+
+function bank(y) { return y < FIELD.riverY ? 0 : 1; }
+
+function stepUnit(M, u, dt) {
+  u.cd = Math.max(0, u.cd - dt);
+  for (const k of ['immune', 'slow', 'quick', 'flower', 'berserk', 'leapCd', 'rt']) if (u[k] > 0) u[k] = Math.max(0, u[k] - dt);
+  if (u.berserk > 0) u.hp = Math.max(1, u.hp - u.maxHp * 0.05 * dt);
+  u.buff = (u.berserk > 0 || u.immune > 0 || u.quick > 0) ? 1 : 0;
+  if (u.duel && !u.duel.alive) u.duel = null;
+  if (u.water) return stepWater(M, u, dt);
+  let T = u.target;
+  if (!T || !T.alive || u.rt <= 0 || u.flower > 0 || (u.duel && T !== u.duel) || (T.side === u.side && !u.flower)) { T = u.target = pickTarget(M, u); u.rt = 0.4; }
+  if (!T) return;
+  const tower = !!T.kind;
+  let d = dist(u, T) - (tower ? 0.03 : 0);
+  if (u.leap && u.leapCd <= 0 && d > u.range && d <= u.leap) {
+    const vx = u.x - T.x, vy = u.y - T.y, L = Math.sqrt(vx * vx + vy * vy) || 1;
+    u.x = T.x + vx / L * 0.04; u.y = T.y + vy / L * 0.03;
+    u.leapCd = 6; u.nextMul = 1.3; u.cd = 0;
+    event(M, { kind: 'charge', x: u.x, y: u.y, side: u.side, leap: true });
+    d = dist(u, T) - (tower ? 0.03 : 0);
+  }
+  if (d <= u.range) {
+    const blind = u.role === 'bow' && blinded(M, u.side, u.x, false);
+    if (!blind && u.cd <= 0) strike(M, u, T);
+    if (!u.mobile || d <= 0.07) { u.ran = 0; return; }
+  }
+  // walk: via a bridge if the moat is between us and the target
+  let tx = T.x, ty = T.y, hold = false;
+  const mb = bank(u.y), tb = bank(T.y);
+  if (mb !== tb || Math.abs(u.y - FIELD.riverY) <= FIELD.band) {
+    if (mb !== tb || Math.abs(u.y - FIELD.riverY) <= FIELD.band) {
+      const dir = tb > mb ? 1 : (tb < mb ? -1 : (T.y > u.y ? 1 : -1));
+      const b = Math.abs(u.x - FIELD.bridges[0]) < Math.abs(u.x - FIELD.bridges[1]) ? FIELD.bridges[0] : FIELD.bridges[1];
+      const inBand = Math.abs(u.y - FIELD.riverY) <= FIELD.band;
+      if (inBand) { if (mb !== tb || true) { tx = b; ty = FIELD.riverY + dir * 0.09; } }
+      else if (mb !== tb) {
+        const ey = FIELD.riverY - dir * 0.09;
+        if (M.flood && M.flood.until > M.t) { tx = b; ty = ey; if (Math.abs(u.x - b) < 0.02 && Math.abs(u.y - ey) < 0.02) hold = true; }
+        else if (Math.abs(u.x - b) > 0.03) { tx = b; ty = ey; }
+        else { tx = b; ty = FIELD.riverY + dir * 0.09; }
+      }
+    }
+  }
+  if (hold) return;
+  const dx = tx - u.x, dy = ty - u.y, len = Math.sqrt(dx * dx + dy * dy) || 1;
+  const sp = u.speed * (u.crossed && u.civ === 'vikings' ? 1.4 : 1) * (u.slow > 0 ? 0.6 : 1) * dt;
+  const step = Math.min(sp, len);
+  u.x += dx / len * step; u.y += dy / len * step;
+  u.facing = dy >= 0 ? 1 : -1;
+  if (!u.crossed && (u.side === 0 ? u.y >= FIELD.riverY : u.y <= FIELD.riverY)) {
+    u.crossed = true;
+    if (u.civ === 'vikings') civrule(M, u, 'moatrush', u.x, u.y, 0);
+  }
+  if (u.charge) { u.ran += step; if (u.ran > 0.12) u.chargeReady = true; }
+  for (const v of M.units) {
+    if (v === u || !v.alive || v.water) continue;
+    const ddx = u.x - v.x, ddy = (u.y - v.y) * 1.6, dd = Math.sqrt(ddx * ddx + ddy * ddy);
+    if (dd < 0.035 && dd > 0.0001) { u.x += ddx / dd * 0.004; u.y += ddy / dd * 0.0025; }
+  }
+  u.x = Math.max(0.03, Math.min(0.97, u.x)); u.y = Math.max(0.02, Math.min(0.98, u.y));
+}
+
+function stepTower(M, t, dt) {
+  if (!t.alive) return;
+  const S = RB.TOWER[t.kind];
+  t.cd = Math.max(0, t.cd - dt);
+  let best = null, bd = 1e9, near = false;
+  for (const u of M.units) {
+    if (!u.alive || u.side === t.side) continue;
+    const d = dist(t, u);
+    if (d < S.range * 1.3) near = true;
+    if (u.duel) continue;
+    if (d < bd) { bd = d; best = u; }
+  }
+  if (t.civ === 'egypt' && !near && t.hp < t.maxHp) {
+    t.hp = Math.min(t.maxHp, t.hp + t.maxHp * 0.01 * dt);
+    civrule(M, t, 'repair', t.x, t.y, 3);
+  }
+  if (!t.awake || t.cd > 0) return;
+  if (best && bd <= S.range && !blinded(M, t.side, t.x, t.kind === 'king')) {
+    t.cd = S.hitEvery;
+    event(M, { kind: 'shot', x: t.x, y: t.y, tx: best.x, ty: best.y, side: t.side });
+    hit(M, t, best, S.dmg);
+  }
+}
+
+function endMatch(M, winner, reason) {
+  if (M.over) return;
+  M.over = true; M.winner = winner; M.reason = reason;
+  event(M, { kind: 'end', winner: winner, reason: reason });
+}
+
+function tick(M, dt) {
+  if (M.over) return;
+  M.t += dt;
+  const late = M.t > RB.MATCH.seconds - RB.MATCH.lateAt;
+  for (const P of M.players) P.energy = Math.min(RB.MATCH.energyMax, P.energy + (late ? RB.MATCH.lateEnergyPerSec : RB.MATCH.energyPerSec) * dt);
+  if (M.storms.length) M.storms = M.storms.filter(function (s) { return s.until > M.t; });
+  if (M.flood && M.flood.until <= M.t) M.flood = null;
+  for (const u of M.units) if (u.alive) stepUnit(M, u, dt);
+  for (const t of M.towers) stepTower(M, t, dt);
+  for (let i = M.units.length - 1; i >= 0; i--) { const u = M.units[i]; if (!u.alive && M.t - (u.died != null ? u.died : (u.died = M.t)) > 1.5) M.units.splice(i, 1); }
+  if (M.over) return;
+  if (M.t >= RB.MATCH.seconds && !M.sudden) {
+    const a = M.players[0].towersLost, b = M.players[1].towersLost;
+    if (a !== b) endMatch(M, a < b ? 0 : 1, 'towers');
+    else { M.sudden = true; say(M, 'Sudden death. The next tower decides it.', -1); event(M, { kind: 'sudden' }); }
+  }
+  if (M.sudden && !M.over && M.t >= RB.MATCH.seconds + RB.MATCH.overtime) {
+    const h = [0, 0];
+    for (const t of M.towers) if (t.alive) h[t.side] += t.hp / t.maxHp;
+    endMatch(M, h[0] === h[1] ? (M.rng() < 0.5 ? 0 : 1) : (h[0] > h[1] ? 0 : 1), 'time');
+  }
+}
+
+RB.newMatch = newMatch; RB.tick = tick; RB.playCard = playCard; RB.canDeploy = canDeploy; RB.cardCost = cardCost;
+RB.FIELD = FIELD; RB.dist = dist; RB.laneOf = laneOf; RB.LANE_X = LANE_X;
+
+</script>
+<script>
+// Epoch. An AZTMM game. (c) 2026 AZTMM HLDGS LLC.
+// 03_ai.js: the opponent. Three tempers (rush, siege, counter). Every decision is a rule a person could explain:
+// answer the threat with the role that beats it, spend the spell on a crowd, play the hero when energy is full and a lane is contested.
+function makeAI(side, temper, rng) {
+  const A = { side: side, temper: temper || 'counter', rng: rng || Math.random, nextThink: 1.0, lastLane: 0, fullSince: -1 };
+  const foe = 1 - side;
+  const LX = [0.25, 0.75];
+  const ORDER = {
+    rush:    ['horse', 'swarm', 'blade', 'bow', 'shield', 'siege'],
+    siege:   ['siege', 'shield', 'bow', 'blade', 'swarm', 'horse'],
+    counter: ['blade', 'shield', 'horse', 'bow', 'swarm', 'siege']
+  }[A.temper] || ['blade', 'shield', 'horse', 'bow', 'swarm', 'siege'];
+  const MINE = { rush: 3, siege: 6.5, counter: 8 }[A.temper] || 6;
+  const lane = function (x) { return x < 0.5 ? 0 : 1; };
+  const inMyHalf = function (u) { return side === 0 ? u.y < 0.5 : u.y > 0.5; };
+  const yAt = function (civ, frac) { return side === 0 ? (civ === 'marathas' ? 0.14 : frac) : (civ === 'marathas' ? 0.86 : 1 - frac); };
+  const FRAC = { shield: 0.34, blade: 0.32, swarm: 0.32, bow: 0.22, horse: 0.30, siege: 0.34, hero: 0.30 };
+  const beatersOf = function (r) { const out = []; for (const k in RB.ROLE_BEATS) if (RB.ROLE_BEATS[k].indexOf(r) >= 0) out.push(k); return out; };
+  const fr = function (u) { return u.as || u.role; };
+
+  A.think = function (M) {
+    if (M.over || M.t < A.nextThink) return null;
+    A.nextThink = M.t + 0.4 + A.rng() * 0.5;
+    const P = M.players[side], civ = P.civ;
+    const cardOf = function (id) { return RB.CARDS[id]; };
+    const x = function (l) { return Math.max(0.08, Math.min(0.92, LX[l] + (A.rng() - 0.5) * 0.08)); };
+    const costAt = function (id, l) { return RB.cardCost(M, side, id, yAt(civ, FRAC[cardOf(id).role] || 0.3)); };
+    const play = function (id, l) { const c = cardOf(id); return RB.playCard(M, side, id, x(l), yAt(civ, FRAC[c.role] || 0.3)); };
+    const spellAt = function (id, l) { return RB.playCard(M, side, id, LX[l], 0.5); };
+    const canPay = function (id) { return P.energy >= costAt(id, 0); };
+    const mine = [[], []], foes = [[], []];
+    for (const u of M.units) if (u.alive) (u.side === side ? mine : foes)[lane(u.x)].push(u);
+    const sum = function (a) { return a.reduce(function (s, u) { return s + u.hp; }, 0); };
+    const hand = P.hand.map(cardOf);
+    const spell = hand.filter(function (c) { return c.role === 'spell'; })[0];
+    const hero = hand.filter(function (c) { return c.role === 'hero'; })[0];
+    const myOuter = M.towers.filter(function (t) { return t.side === side && t.kind === 'outer'; });
+    const foeOuter = M.towers.filter(function (t) { return t.side === foe && t.kind === 'outer'; });
+
+    // 1. Spell on a crowded lane
+    if (spell && canPay(spell.id)) {
+      const k = spell.spellKind;
+      for (let pass = 0; pass < 2; pass++) {
+        const l = pass === 0 ? A.lastLane : 1 - A.lastLane;
+        const F = foes[l], Mn = mine[l];
+        let ok = false;
+        if (k === 'aoe' || k === 'slow') ok = F.length >= 3;
+        else if (k === 'chaos') ok = F.length >= 3 && F.filter(inMyHalf).length >= 1;
+        else if (k === 'tower') {
+          const t = foeOuter.filter(function (q) { return q.alive && lane(q.x) === l; })[0];
+          ok = !!t && (t.hp <= 420 || (P.energy >= 9.5 && Mn.length >= 1));
+        } else if (k === 'haste') ok = Mn.length >= 2 && F.some(function (f) { return Mn.some(function (m) { return RB.dist(f, m) < 0.12; }); });
+        else if (k === 'flood') ok = F.length >= 3 && F.every(function (u) { return !inMyHalf(u); }) && F.some(function (u) { return Math.abs(u.y - 0.5) < 0.2; });
+        if (ok) { const r = spellAt(spell.id, l); if (r && r.ok) return r; }
+      }
+    }
+
+    // 2. Threat in my half: answer with the role that beats it
+    let worst = null, wl = 0;
+    for (let l = 0; l < 2; l++) for (const u of foes[l]) if (inMyHalf(u)) {
+      if (!worst || (side === 0 ? u.y < worst.y : u.y > worst.y)) { worst = u; wl = l; }
+    }
+    if (worst) {
+      const group = foes[wl].filter(inMyHalf), tHp = sum(group);
+      const mHp = sum(mine[wl].filter(inMyHalf));
+      const byRole = {};
+      for (const u of group) byRole[fr(u)] = (byRole[fr(u)] || 0) + u.hp;
+      let tr = fr(worst), top = -1;
+      for (const r in byRole) if (byRole[r] > top) { top = byRole[r]; tr = r; }
+      if (hero && P.energy >= cardOf(hero.id).cost && tHp >= 450 && mHp < tHp * 0.6) { const r = play(hero.id, wl); if (r && r.ok) return r; }
+      if (mHp < tHp * 1.3) {
+        const beaters = beatersOf(tr);
+        let best = null, bs = -99;
+        for (const c of hand) {
+          if (c.role === 'spell' || c.role === 'hero' || c.role === 'siege' || !canPay(c.id)) continue;
+          let s = 0;
+          if (beaters.indexOf(c.role) >= 0) s += 3;
+          const mine_ = RB.ROLE_BEATS[tr] || [];
+          if (mine_.indexOf(c.role) >= 0) s -= 2;
+          if (tr === 'siege') s += c.role === 'horse' ? 3 : 1;
+          s -= costAt(c.id, wl) * 0.15;
+          if (s > bs) { bs = s; best = c; }
+        }
+        if (best && bs > -1) { const r = play(best.id, wl); if (r && r.ok) { A.lastLane = wl; return r; } }
+      }
+    }
+
+    // 3. Hero: energy full and a lane is contested (or it has waited long enough)
+    if (P.energy >= 9.9) { if (A.fullSince < 0) A.fullSince = M.t; } else A.fullSince = -1;
+    if (hero && P.energy >= Math.max(9, cardOf(hero.id).cost)) {
+      let cl = -1;
+      for (let l = 0; l < 2; l++) if (mine[l].length && foes[l].length) cl = l;
+      if (cl < 0 && A.fullSince >= 0 && M.t - A.fullSince > 3) cl = A.lastLane;
+      if (cl >= 0 && !(hero.power === 'duel' && !foes[cl].length)) { const r = play(hero.id, cl); if (r && r.ok) { A.lastLane = cl; return r; } }
+    }
+
+    // 4. Attack by temper
+    const reserve = hero ? 9 : MINE;
+    if (P.energy < Math.min(reserve, MINE === 3 ? 3 : MINE)) return null;
+    if (hero && P.energy < 9 && A.temper !== 'rush') return null;
+    let l;
+    const alive = foeOuter.filter(function (t) { return t.alive; }).sort(function (a, b) { return a.hp - b.hp; })[0];
+    if (A.temper === 'counter') l = mine[0].length >= mine[1].length ? (mine[0].length ? 0 : A.lastLane) : 1;
+    else l = alive ? lane(alive.x) : A.lastLane;
+    if (A.rng() < 0.2) l = 1 - l;
+    A.lastLane = l;
+    for (const role of ORDER) {
+      const c = hand.filter(function (h) { return h.role === role && canPay(h.id); })[0];
+      if (!c) continue;
+      if (c.role === 'siege' && !mine[l].length && mine[1 - l].length) l = 1 - l;
+      const r = play(c.id, l);
+      if (r && r.ok) return r;
+    }
+    return null;
+  };
+  return A;
+}
+RB.makeAI = makeAI;
+
+</script>
+<script>
+// Epoch. An AZTMM game. (c) 2026 AZTMM HLDGS LLC.
+// 04_figures.js: the figure library. Canvas 2D paths only, no bitmaps. Flat shaded: a fill, one lighter strip, one darker strip, one outline tone.
+// Exports (on the shared RB): drawFigure(ctx, cardId, side, s, ph, state), drawRoleIcon(ctx, role, size), figureHeight(cardId), figureWidth(cardId).
+// Units: everything inside is drawn in "figure units" (1 unit = s px), feet at (0,0), up is negative y, figure faces the viewer, weapons lean to +x.
+(function () {
+  'use strict';
+
+  // ---------------------------------------------------------------- palettes
+  const PAL0 = {
+    rome:     { body: '#b3262f', dark: '#6e1219', cloth: '#ecdcb6', metal: '#c9954a', flag: '#d63a3a', acc: '#e0b94f', skin: '#d8a47a', steel: '#c4c9cf', wood: '#7a5230', hair: '#4a3020' },
+    vikings:  { body: '#2f78ad', dark: '#183f5e', cloth: '#dccfae', metal: '#a3acb4', flag: '#1a1c22', acc: '#cfa85e', skin: '#e3b896', steel: '#c4c9cf', wood: '#7a5230', hair: '#b07a3c' },
+    marathas: { body: '#f08a1d', dark: '#9c4f12', cloth: '#f6e6bd', metal: '#d0ccc0', flag: '#f08a1d', acc: '#c27a2a', skin: '#b9794a', steel: '#d3d6da', wood: '#6e4a2a', hair: '#2a1a10' },
+    aztecs:   { body: '#1f9e75', dark: '#0e5a45', cloth: '#f1e2c0', metal: '#2bbac0', flag: '#d63a2c', acc: '#ecc64a', skin: '#a8643a', steel: '#1b1b24', wood: '#9a6a38', hair: '#15110d' },
+    samurai:  { body: '#3a4eb4', dark: '#1c2670', cloth: '#f3f0e6', metal: '#b9bcc4', flag: '#c8322b', acc: '#d9b449', skin: '#e0b48a', steel: '#d6dae0', wood: '#6a4a2c', hair: '#15110d' },
+    egypt:    { body: '#d8b45c', dark: '#8a6a22', cloth: '#f6eed8', metal: '#e4bc3a', flag: '#2a5cb0', acc: '#2a5cb0', skin: '#b87a48', steel: '#c9954a', wood: '#7a5230', hair: '#16131a' }
+  };
+  const SIDE_RING = ['#58b0ff', '#ff6a58'];
+  const CIVS = ['rome', 'vikings', 'marathas', 'aztecs', 'samurai', 'egypt'];
+
+  function palFor(civ) {
+    const base = PAL0[civ] || PAL0.rome, out = {};
+    for (const k in base) out[k] = base[k];
+    const c = (typeof RB !== 'undefined' && RB.CIVS && RB.CIVS[civ]) ? RB.CIVS[civ].palette : null;
+    if (c) for (const k in c) if (c[k]) out[k] = c[k];
+    return out;
+  }
+
+  // ---------------------------------------------------------------- id resolution (tolerant)
+  const CIV_KW = {
+    rome: /rome|roman|legion|velit|equite|ballista|centurion|gladiat|auxili|pilum/,
+    vikings: /viking|norse|shield_?wall|berserk|raider|bowmen|longship|jarl|raven|ram_?viking|battering/,
+    marathas: /maratha|shiledar|dandpatta|mavl|mavale|hetkari|bargir|rocket|raje|ghorpad/,
+    aztecs: /aztec|jaguar|eagle|levies_?aztec|atlatl|runner|fire_?bearer|flower/,
+    samurai: /samurai|ashigaru|peasant|yabusame|ozutsu|ronin|kiai/,
+    egypt: /egypt|shieldbearer|khopesh|chariot|obelisk|pharaoh|flood|composite/
+  };
+  const ROLE_KW = [
+    ['hero', /centurion|jarl|raje|eagle_?knight|ronin|pharaoh|champion|hero/],
+    ['spell', /volley|raven_?s?_?call|ghorpad|flower_?war|kiai|flood|spell/],
+    ['bow', /archer|bowm|hetkari|atlatl|musket|(^|_)bow($|_)/],
+    ['siege', /ballista|(^|_)ram($|_)|battering|rocket|fire_?bearer|ozutsu|obelisk|siege|catapult/],
+    ['horse', /equite|longship|ship|bargir|runner|yabusame|chariot|horse|cavalry/],
+    ['swarm', /velit|raider|mavl|mavale|levies|levy|peasant|swarm/],
+    ['shield', /legionar|legion|shield|shiledar|jaguar|ashigaru|hoplite/],
+    ['blade', /gladiat|berserk|dandpatta|eagle|samurai|khopesh|blade|sword/]
+  ];
+  const ROLES = { shield: 1, blade: 1, swarm: 1, bow: 1, horse: 1, siege: 1, hero: 1, spell: 1 };
+  const OVERRIDE = {}; // per-card override: OVERRIDE[id] = { civ, role }
+  const cache = {};
+
+  function resolve(id) {
+    id = String(id == null ? '' : id).toLowerCase();
+    if (cache[id]) return cache[id];
+    let civ = null, role = null;
+    const card = (typeof RB !== 'undefined' && RB.CARDS) ? RB.CARDS[id] : null;
+    if (card) { if (CIV_KW[card.civ] !== undefined) civ = card.civ; if (ROLES[card.role]) role = card.role; }
+    if (OVERRIDE[id]) { civ = OVERRIDE[id].civ || civ; role = OVERRIDE[id].role || role; }
+    if (!civ) {
+      const pre = id.split(/[_\-: ]/)[0];
+      if (CIV_KW[pre] !== undefined) civ = pre;
+      else for (const c of CIVS) if (CIV_KW[c].test(id)) { civ = c; break; }
+    }
+    if (!role) for (const r of ROLE_KW) if (r[1].test(id)) { role = r[0]; break; }
+    // heroes by name even when the card role says otherwise
+    if (!civ) { let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0; civ = CIVS[h % 6]; }
+    if (!role) role = 'blade';
+    return (cache[id] = { civ: civ, role: role, id: id });
+  }
+
+  // ---------------------------------------------------------------- drawing state and primitives
+  let g, LW, HURT, P, LN, SW, CV, PHASE;
+  const mixCache = {};
+  function hex(c) {
+    if (c[0] !== '#') return [128, 128, 128];
+    if (c.length === 4) return [parseInt(c[1] + c[1], 16), parseInt(c[2] + c[2], 16), parseInt(c[3] + c[3], 16)];
+    return [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)];
+  }
+  function mix(a, b, t) {
+    const key = a + b + (t * 20 | 0);
+    if (mixCache[key]) return mixCache[key];
+    const x = hex(a), y = hex(b);
+    const r = '#' + [0, 1, 2].map(i => ('0' + Math.round(x[i] + (y[i] - x[i]) * t).toString(16)).slice(-2)).join('');
+    return (mixCache[key] = r);
+  }
+  function col(c) { return HURT > 0.01 ? mix(c, '#ffffff', Math.min(0.7, HURT * 0.7)) : c; }
+  const hi = c => mix(c, '#ffffff', 0.26), lo = c => mix(c, '#000000', 0.26);
+
+  function finish(fill, bb, flat) {
+    g.fillStyle = col(fill); g.fill();
+    if (!flat && bb && bb[2] > 0.05) {
+      g.save(); g.clip();
+      g.fillStyle = col(hi(fill)); g.fillRect(bb[0], bb[1], bb[2] * 0.3, bb[3]);
+      g.fillStyle = col(lo(fill)); g.fillRect(bb[0] + bb[2] * 0.7, bb[1], bb[2] * 0.4, bb[3]);
+      g.restore();
+    }
+    g.lineWidth = LW; g.strokeStyle = col(LN); g.lineJoin = 'round'; g.stroke();
+  }
+  function poly(pts, fill, flat) {
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    g.beginPath();
+    for (let i = 0; i < pts.length; i += 2) {
+      const x = pts[i], y = pts[i + 1];
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+      if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+    }
+    g.closePath(); finish(fill, [x0, y0, x1 - x0, y1 - y0], flat);
+  }
+  function ell(cx, cy, rx, ry, fill, rot, flat) {
+    g.beginPath(); g.ellipse(cx, cy, rx, ry, rot || 0, 0, 6.2832);
+    finish(fill, [cx - rx, cy - ry, rx * 2, ry * 2], flat);
+  }
+  function rect(x, y, w, h, fill, r, flat) {
+    r = Math.min(r || 0, w / 2, h / 2);
+    g.beginPath(); g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r); g.lineTo(x + w, y + h - r);
+    g.quadraticCurveTo(x + w, y + h, x + w - r, y + h); g.lineTo(x + r, y + h); g.quadraticCurveTo(x, y + h, x, y + h - r); g.lineTo(x, y + r);
+    g.quadraticCurveTo(x, y, x + r, y); g.closePath(); finish(fill, [x, y, w, h], flat);
+  }
+  function limb(x1, y1, x2, y2, w, fill) {
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2);
+    g.strokeStyle = col(LN); g.lineWidth = w + LW * 2; g.stroke();
+    g.strokeStyle = col(fill); g.lineWidth = w; g.stroke();
+    g.lineCap = 'butt';
+  }
+  function trail(pts, w, fill) { // polyline limb
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    g.beginPath(); g.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i], pts[i + 1]);
+    g.strokeStyle = col(LN); g.lineWidth = w + LW * 2; g.stroke();
+    g.strokeStyle = col(fill); g.lineWidth = w; g.stroke(); g.lineCap = 'butt';
+  }
+  function bez(x0, y0, cx, cy, x1, y1, n) { const o = []; for (let i = 0; i <= n; i++) { const t = i / n, u = 1 - t; o.push(u * u * x0 + 2 * u * t * cx + t * t * x1, u * u * y0 + 2 * u * t * cy + t * t * y1); } return o; }
+  function dot(x, y, r, fill) { g.beginPath(); g.arc(x, y, r, 0, 6.2832); g.fillStyle = col(fill); g.fill(); }
+  function wheel(x, y, r, rot, fill, spokes) {
+    ell(x, y, r, r, fill, 0, true);
+    g.strokeStyle = col(LN); g.lineWidth = LW * 1.1;
+    g.beginPath();
+    for (let i = 0; i < spokes; i++) { const a = rot + i * Math.PI / spokes; g.moveTo(x + Math.cos(a) * r, y + Math.sin(a) * r); g.lineTo(x - Math.cos(a) * r, y - Math.sin(a) * r); }
+    g.stroke();
+    ell(x, y, r * 0.22, r * 0.22, P.metal, 0, true);
+    g.beginPath(); g.arc(x, y, r * 0.9, 0, 6.2832); g.lineWidth = r * 0.16; g.strokeStyle = col(hi(fill)); g.globalAlpha = 0.0; g.stroke(); g.globalAlpha = 1;
+  }
+
+  // ---------------------------------------------------------------- weapons (grip at 0,0, blade points up (-y), rotated by ang)
+  function weapon(kind, gx, gy, ang, len) {
+    g.save(); g.translate(gx, gy); g.rotate(ang);
+    switch (kind) {
+      case 'spear': {
+        limb(0, 0.28, 0, -len, 0.06, P.wood);
+        poly([0, -len - 0.26, 0.075, -len - 0.04, 0, -len + 0.04, -0.075, -len - 0.04], P.steel);
+        break;
+      }
+      case 'yari': {
+        limb(0, 0.28, 0, -len, 0.055, P.wood);
+        poly([0, -len - 0.34, 0.05, -len - 0.04, -0.05, -len - 0.04], P.steel);
+        poly([-0.07, -len + 0.08, 0.07, -len + 0.08, 0.05, -len + 0.3, -0.05, -len + 0.3], P.flag, true);
+        break;
+      }
+      case 'gladius': {
+        poly([-0.05, -0.02, 0.05, -0.02, 0.065, -len * 0.55, 0.0, -len, -0.065, -len * 0.55], P.steel);
+        rect(-0.11, -0.04, 0.22, 0.05, P.metal, 0.02, true);
+        rect(-0.03, 0, 0.06, 0.15, P.wood, 0.02, true); dot(0, 0.17, 0.045, P.metal);
+        break;
+      }
+      case 'axe': {
+        limb(0, 0.25, 0, -len, 0.07, P.wood);
+        poly([0.0, -len - 0.04, 0.2, -len - 0.2, 0.42, -len - 0.18, 0.33, -len + 0.05, 0.4, -len + 0.3, 0.2, -len + 0.32, 0, -len + 0.2], P.metal);
+        break;
+      }
+      case 'dand': { // gauntlet sword
+        poly([-0.045, -0.12, 0.045, -0.12, 0.04, -len, 0, -len - 0.1, -0.04, -len], P.steel);
+        g.beginPath(); g.ellipse(0, 0.02, 0.15, 0.13, 0, Math.PI, 0, true); finish(P.metal, [-0.15, -0.11, 0.3, 0.13]);
+        rect(-0.1, 0, 0.2, 0.2, P.metal, 0.05);
+        dot(0, -0.12, 0.05, P.acc);
+        break;
+      }
+      case 'macua': {
+        poly([-0.075, 0.1, 0.075, 0.1, 0.1, -len * 0.85, 0, -len, -0.1, -len * 0.85], P.wood);
+        for (let i = 0; i < 6; i++) {
+          const y = -0.06 - i * len * 0.14;
+          poly([0.085, y + 0.07, 0.17, y, 0.085, y - 0.07], P.steel, true);
+          poly([-0.085, y + 0.07, -0.17, y, -0.085, y - 0.07], P.steel, true);
+        }
+        rect(-0.04, 0.1, 0.08, 0.22, P.flag, 0.03, true);
+        break;
+      }
+      case 'katana': {
+        trail([0, 0, 0.012, -len * 0.5, 0.075, -len], 0.05, P.steel);
+        ell(0, -0.01, 0.1, 0.045, P.acc, 0, true);
+        rect(-0.035, 0, 0.07, 0.3, P.body, 0.03, true);
+        break;
+      }
+      case 'khopesh': {
+        trail([0, 0.05, 0, -len * 0.5].concat(bez(0, -len * 0.5, 0.02, -len * 1.02, 0.36, -len * 0.98, 7)), 0.085, P.metal);
+        rect(-0.04, 0.02, 0.08, 0.25, P.flag, 0.03, true); dot(0, 0.3, 0.05, P.metal);
+        break;
+      }
+      case 'talwar': {
+        trail(bez(0, -0.02, 0.0, -len * 0.7, 0.28, -len, 7), 0.07, P.steel);
+        g.beginPath(); g.arc(0.0, 0.05, 0.12, Math.PI * 1.1, Math.PI * 0.2); finish(P.metal, null, true);
+        rect(-0.035, 0.02, 0.07, 0.2, P.wood, 0.02, true); dot(0, 0.24, 0.05, P.metal);
+        break;
+      }
+    }
+    g.restore();
+  }
+
+  // ---------------------------------------------------------------- headgear
+  function hat(kind, cx, cy, big) {
+    const m = P.metal, f = P.flag, b = P.body;
+    switch (kind) {
+      case 'galea': case 'crest': {
+        g.beginPath(); g.arc(cx, cy - 0.01, 0.21, Math.PI, 0); g.closePath(); finish(m, [cx - 0.21, cy - 0.22, 0.42, 0.21]);
+        rect(cx - 0.22, cy - 0.05, 0.44, 0.06, hi(m), 0.02, true);
+        rect(cx - 0.21, cy - 0.01, 0.07, 0.2, m, 0.03, true); rect(cx + 0.14, cy - 0.01, 0.07, 0.2, m, 0.03, true);
+        if (kind === 'crest') { // centurion transverse crest
+          rect(cx - 0.03, cy - 0.3, 0.06, 0.1, m, 0, true);
+          g.beginPath(); g.ellipse(cx, cy - 0.34, 0.4, 0.1, 0, 0, 6.2832); finish(f, [cx - 0.4, cy - 0.44, 0.8, 0.2]);
+        } else {
+          poly([cx - 0.04, cy - 0.2, cx + 0.04, cy - 0.2, cx + 0.07, cy - 0.34, cx - 0.07, cy - 0.34], f, true);
+          ell(cx, cy - 0.34, 0.085, 0.07, f, 0, true);
+        }
+        break;
+      }
+      case 'gladiator': { // visored murmillo helm with tall fin
+        g.beginPath(); g.arc(cx, cy - 0.01, 0.22, Math.PI, 0); g.closePath(); finish(m, [cx - 0.22, cy - 0.23, 0.44, 0.22]);
+        rect(cx - 0.22, cy - 0.04, 0.44, 0.26, m, 0.05);
+        rect(cx - 0.14, cy + 0.0, 0.28, 0.06, '#1a1410', 0.02, true);
+        poly([cx - 0.02, cy - 0.22, cx + 0.03, cy - 0.22, cx + 0.1, cy - 0.5, cx - 0.1, cy - 0.5], f);
+        break;
+      }
+      case 'vhelm': {
+        poly([cx - 0.2, cy - 0.04, cx - 0.14, cy - 0.2, cx, cy - 0.36, cx + 0.14, cy - 0.2, cx + 0.2, cy - 0.04], m);
+        rect(cx - 0.21, cy - 0.1, 0.42, 0.06, P.acc, 0.02, true);
+        rect(cx - 0.025, cy - 0.06, 0.05, 0.2, m, 0.02, true);
+        break;
+      }
+      case 'beard': {
+        poly([cx - 0.17, cy - 0.01, cx + 0.17, cy - 0.01, cx + 0.12, cy + 0.2, cx, cy + 0.32, cx - 0.12, cy + 0.2], P.hair);
+        break;
+      }
+      case 'wild': { // berserker: wild hair + beard, wolf pelt
+        poly([cx - 0.22, cy + 0.05, cx - 0.25, cy - 0.15, cx - 0.12, cy - 0.3, cx, cy - 0.24, cx + 0.12, cy - 0.3, cx + 0.25, cy - 0.15, cx + 0.22, cy + 0.05, cx + 0.12, cy - 0.06, cx - 0.12, cy - 0.06], P.hair);
+        poly([cx - 0.17, cy - 0.01, cx + 0.17, cy - 0.01, cx + 0.14, cy + 0.2, cx, cy + 0.34, cx - 0.14, cy + 0.2], P.hair);
+        break;
+      }
+      case 'pagdi': {
+        g.beginPath(); g.ellipse(cx, cy - 0.12, 0.27, 0.17, 0, 0, 6.2832); finish(P.cloth, [cx - 0.27, cy - 0.29, 0.54, 0.34]);
+        g.strokeStyle = col(b); g.lineWidth = LW * 2.2; g.beginPath(); g.ellipse(cx, cy - 0.12, 0.27, 0.17, 0, 0.2, 2.4); g.stroke();
+        g.strokeStyle = col(P.acc); g.lineWidth = LW * 1.6; g.beginPath(); g.ellipse(cx, cy - 0.15, 0.18, 0.1, 0, 3.4, 5.9); g.stroke();
+        poly([cx + 0.2, cy - 0.12, cx + 0.34, cy + 0.06, cx + 0.22, cy + 0.12, cx + 0.14, cy - 0.02], P.cloth);
+        if (big) { dot(cx, cy - 0.3, 0.06, P.acc); poly([cx, cy - 0.34, cx - 0.04, cy - 0.58, cx + 0.05, cy - 0.5, cx + 0.1, cy - 0.34], '#f3f0e6', true); }
+        break;
+      }
+      case 'feathers': {
+        const cs = [f, P.metal, b, P.acc, f, P.metal, b];
+        for (let i = 0; i < 7; i++) {
+          const a = -1.35 + i * 0.45, bx = cx, by = cy - 0.1;
+          g.save(); g.translate(bx, by); g.rotate(a);
+          ell(0, -0.3, 0.075, 0.28, cs[i], 0, true); g.restore();
+        }
+        rect(cx - 0.2, cy - 0.15, 0.4, 0.07, P.acc, 0.02);
+        break;
+      }
+      case 'jaguar': {
+        ell(cx - 0.17, cy - 0.2, 0.07, 0.07, '#d4a24a', 0, true); ell(cx + 0.17, cy - 0.2, 0.07, 0.07, '#d4a24a', 0, true);
+        g.beginPath(); g.arc(cx, cy - 0.04, 0.23, Math.PI, 0); g.closePath(); finish('#d4a24a', [cx - 0.23, cy - 0.27, 0.46, 0.23]);
+        for (const p of [[-0.1, -0.15], [0.08, -0.18], [0.0, -0.08], [-0.17, -0.07], [0.16, -0.08]]) dot(cx + p[0], cy + p[1], 0.032, '#2a1a10');
+        poly([cx - 0.2, cy - 0.04, cx - 0.14, cy + 0.04, cx - 0.1, cy - 0.04], '#f6efe0', true); poly([cx + 0.2, cy - 0.04, cx + 0.14, cy + 0.04, cx + 0.1, cy - 0.04], '#f6efe0', true);
+        break;
+      }
+      case 'eagle': {
+        for (let i = 0; i < 5; i++) { g.save(); g.translate(cx, cy - 0.05); g.rotate(-0.9 + i * 0.45); ell(0, -0.3, 0.07, 0.26, i % 2 ? '#f6efe0' : '#6a4a2c', 0, true); g.restore(); }
+        g.beginPath(); g.arc(cx, cy - 0.03, 0.22, Math.PI, 0); g.closePath(); finish('#6a4a2c', [cx - 0.22, cy - 0.25, 0.44, 0.22]);
+        poly([cx - 0.12, cy - 0.12, cx + 0.12, cy - 0.12, cx + 0.04, cy + 0.1, cx - 0.04, cy + 0.1], '#f0c23a');
+        break;
+      }
+      case 'kabuto': {
+        g.beginPath(); g.arc(cx, cy - 0.01, 0.22, Math.PI, 0); g.closePath(); finish(P.dark, [cx - 0.22, cy - 0.23, 0.44, 0.22]);
+        poly([cx - 0.24, cy - 0.04, cx + 0.24, cy - 0.04, cx + 0.34, cy + 0.14, cx - 0.34, cy + 0.14], P.body);
+        for (const dy of [0.02, 0.08]) { g.strokeStyle = col(f); g.lineWidth = LW * 1.4; g.beginPath(); g.moveTo(cx - 0.3 + dy, cy + dy); g.lineTo(cx + 0.3 - dy, cy + dy); g.stroke(); }
+        trail([cx - 0.04, cy - 0.2, cx - 0.12, cy - 0.34, cx - 0.26, cy - 0.44], 0.045, P.acc); trail([cx + 0.04, cy - 0.2, cx + 0.12, cy - 0.34, cx + 0.26, cy - 0.44], 0.045, P.acc);
+        if (big) dot(cx, cy - 0.3, 0.05, P.acc);
+        break;
+      }
+      case 'jingasa': {
+        poly([cx - 0.36, cy - 0.02, cx, cy - 0.34, cx + 0.36, cy - 0.02], '#2c2c36');
+        dot(cx, cy - 0.12, 0.05, f);
+        break;
+      }
+      case 'nemes': {
+        const path = () => {
+          g.beginPath(); g.moveTo(cx - 0.2, cy - 0.1); g.lineTo(cx, cy - 0.26); g.lineTo(cx + 0.2, cy - 0.1); g.lineTo(cx + 0.28, cy + 0.26); g.lineTo(cx + 0.17, cy + 0.26);
+          g.lineTo(cx + 0.17, cy + 0.0); g.lineTo(cx - 0.17, cy + 0.0); g.lineTo(cx - 0.17, cy + 0.26); g.lineTo(cx - 0.28, cy + 0.26); g.closePath();
+        };
+        path(); g.fillStyle = col(P.metal); g.fill(); g.save(); g.clip();
+        g.fillStyle = col(f); for (let i = 0; i < 6; i++) g.fillRect(cx - 0.3, cy - 0.28 + i * 0.1, 0.6, 0.045);
+        g.fillStyle = col(hi(P.metal)); g.globalAlpha = 0.5; g.fillRect(cx - 0.3, cy - 0.3, 0.1, 0.6); g.globalAlpha = 1;
+        g.restore(); path(); g.lineWidth = LW; g.strokeStyle = col(LN); g.stroke();
+        poly([cx - 0.025, cy - 0.27, cx + 0.025, cy - 0.27, cx + 0.03, cy - 0.38, cx - 0.03, cy - 0.38], P.metal, true);
+        if (big) { rect(cx - 0.05, cy - 0.5, 0.1, 0.3, P.cloth, 0.04); ell(cx, cy - 0.54, 0.08, 0.1, f); }
+        break;
+      }
+      case 'linen': {
+        g.beginPath(); g.arc(cx, cy - 0.02, 0.19, Math.PI, 0); g.closePath(); finish(P.cloth, [cx - 0.19, cy - 0.21, 0.38, 0.19]);
+        break;
+      }
+      case 'wig': {
+        poly([cx - 0.2, cy - 0.04, cx - 0.2, cy - 0.2, cx, cy - 0.27, cx + 0.2, cy - 0.2, cx + 0.2, cy - 0.04, cx + 0.24, cy + 0.2, cx + 0.15, cy + 0.2, cx + 0.14, cy - 0.04, cx - 0.14, cy - 0.04, cx - 0.15, cy + 0.2, cx - 0.24, cy + 0.2], '#1b1a24');
+        rect(cx - 0.2, cy - 0.14, 0.4, 0.04, P.metal, 0.01, true);
+        break;
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------- the person
+  const LEGC = { rome: 'skin', vikings: '#6b4a2f', marathas: 'cloth', aztecs: 'skin', samurai: 'dark', egypt: 'skin' };
+  const ARMC = { rome: 'skin', vikings: 'body', marathas: 'body', aztecs: 'skin', samurai: 'body', egypt: 'skin' };
+
+  function person(o) {
+    const k = o.k || 1, lean = o.lean || 0;
+    g.save(); g.translate(o.x || 0, o.y || 0); g.scale(k, k);
+    const lw0 = LW; LW = lw0 / k;
+    const sw = o.still ? 0 : SW;
+    const skin = o.skin || P.skin, tun = o.tunic || P.body;
+    const legc = o.legc || (LEGC[CV] === 'skin' ? skin : (P[LEGC[CV]] || LEGC[CV]));
+    const armc = o.armc || (ARMC[CV] === 'skin' ? skin : P[ARMC[CV]]);
+    const bob = o.still ? 0 : -Math.abs(sw) * 0.05;
+    if (o.back) o.back();
+    g.translate(0, bob);
+    // legs
+    let fl, fr;
+    if (o.stance === 'lunge') { fl = [-0.34, -Math.max(0, sw) * 0.07]; fr = [0.4, 0]; }
+    else if (o.stance === 'wide') { fl = [-0.26 + sw * 0.05, 0]; fr = [0.26 - sw * 0.05, 0]; }
+    else { const d = sw * 0.17; fl = [-0.13 + d, -Math.max(0, sw) * 0.09]; fr = [0.13 - d, -Math.max(0, -sw) * 0.09]; }
+    const lw = CV === 'samurai' ? 0.26 : 0.17;
+    if (o.legs === 'sit') {
+      limb(-0.1, -0.72, -0.36, -0.42, 0.17, legc); limb(0.1, -0.72, 0.36, -0.42, 0.17, legc);
+    } else if (o.legs !== 'none') {
+      limb(-0.1, -0.74, fl[0], fl[1] - 0.04, lw, legc); limb(0.1, -0.74, fr[0], fr[1] - 0.04, lw, legc);
+      ell(fl[0] + 0.02, fl[1] - 0.02, 0.12, 0.06, P.dark, 0, true); ell(fr[0] + 0.02, fr[1] - 0.02, 0.12, 0.06, P.dark, 0, true);
+    }
+    // lower garment
+    if (!o.noskirt) {
+      if (CV === 'rome') poly([-0.25, -0.8, 0.25, -0.8, 0.29, -0.5, -0.29, -0.5], o.tunic || P.body);
+      else if (CV === 'egypt') poly([-0.25, -0.8, 0.25, -0.8, 0.32, -0.38, -0.32, -0.38], P.cloth);
+      else if (CV === 'marathas') poly([-0.24, -0.8, 0.24, -0.8, 0.3, -0.34, -0.3, -0.34], P.cloth);
+      else if (CV === 'aztecs') poly([-0.18, -0.8, 0.18, -0.8, 0.2, -0.5, -0.2, -0.5], P.flag);
+      else if (CV === 'samurai') poly([-0.26, -0.8, 0.26, -0.8, 0.34, -0.42, -0.34, -0.42], P.body);
+      else if (CV === 'vikings') poly([-0.25, -0.8, 0.25, -0.8, 0.28, -0.52, -0.28, -0.52], P.body);
+    }
+    // torso
+    const chestBare = CV === 'egypt' || CV === 'aztecs';
+    poly([-0.27 + lean, -1.3, 0.27 + lean, -1.3, 0.23, -0.7, -0.23, -0.7], chestBare ? skin : tun);
+    garb(lean, o);
+    // head
+    const hx = lean * 0.9, hy = -1.48;
+    ell(hx, hy, 0.175, 0.185, skin);
+    if (o.hat === 'beard' || o.beard) hat('beard', hx, hy);
+    hat(o.hat || 'none', hx, hy, o.big);
+    // arms
+    const hl = o.hl || [-0.38, -0.8 + sw * 0.09], hr = o.hr || [0.38, -0.8 - sw * 0.09];
+    limb(-0.26 + lean, -1.24, hl[0], hl[1], 0.14, armc); limb(0.26 + lean, -1.24, hr[0], hr[1], 0.14, armc);
+    dot(hl[0], hl[1], 0.075, skin); dot(hr[0], hr[1], 0.075, skin);
+    if (o.front) o.front(hl, hr);
+    LW = lw0; g.restore();
+  }
+
+  function garb(lean, o) {
+    const m = P.metal;
+    switch (CV) {
+      case 'rome': // segmentata bands, bronze collar
+        for (let i = 0; i < 4; i++) rect(-0.26 + lean * (1 - i / 4) * 0.2, -1.27 + i * 0.13, 0.52, 0.09, i % 2 ? P.steel : hi(P.steel), 0.03, true);
+        rect(-0.18 + lean, -1.3, 0.36, 0.05, m, 0.02, true);
+        break;
+      case 'vikings': // mail with ringed texture, belt
+        rect(-0.24 + lean * 0.3, -1.26, 0.48, 0.5, P.steel, 0.05, true);
+        g.fillStyle = col(lo(P.steel)); for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) g.fillRect(-0.2 + j * 0.11 + (i % 2) * 0.05 + lean * 0.3, -1.2 + i * 0.12, 0.04, 0.04);
+        rect(-0.25, -0.84, 0.5, 0.07, '#4a3020', 0.02, true); rect(-0.04, -0.85, 0.08, 0.09, P.acc, 0.02, true);
+        break;
+      case 'marathas': // crossed angarkha panel and sash
+        poly([-0.04 + lean, -1.3, 0.07 + lean, -1.3, 0.24, -0.7, 0.1, -0.7], hi(P.body), true);
+        rect(-0.26, -0.88, 0.52, 0.1, P.cloth, 0.02, true); rect(-0.26, -0.88, 0.52, 0.03, P.acc, 0, true);
+        break;
+      case 'aztecs': // quilted cotton vest, jade collar
+        poly([-0.26 + lean, -1.28, 0.26 + lean, -1.28, 0.23, -0.72, -0.23, -0.72], P.cloth);
+        g.strokeStyle = col(lo(P.cloth)); g.lineWidth = LW * 0.8; g.beginPath(); for (let i = 1; i < 4; i++) { g.moveTo(-0.24, -1.28 + i * 0.14); g.lineTo(0.24, -1.28 + i * 0.14); } g.stroke();
+        ell(lean, -1.27, 0.2, 0.07, P.metal, 0, true);
+        break;
+      case 'samurai': // lacquered plates, red lacing
+        for (let i = 0; i < 4; i++) rect(-0.26 + lean * 0.2, -1.27 + i * 0.14, 0.52, 0.12, i % 2 ? P.dark : P.body, 0.02, true);
+        for (let i = 0; i < 4; i++) rect(-0.26 + lean * 0.2, -1.17 + i * 0.14, 0.52, 0.025, P.flag, 0, true);
+        poly([-0.34 + lean, -1.3, -0.12 + lean, -1.3, -0.14 + lean, -1.12, -0.36 + lean, -1.12], P.body); poly([0.34 + lean, -1.3, 0.12 + lean, -1.3, 0.14 + lean, -1.12, 0.36 + lean, -1.12], P.body);
+        break;
+      case 'egypt': // broad collar and belt
+        g.beginPath(); g.moveTo(-0.24 + lean, -1.3); g.quadraticCurveTo(lean, -0.9, 0.24 + lean, -1.3); g.closePath(); finish(P.metal, [-0.24 + lean, -1.3, 0.48, 0.36]);
+        g.beginPath(); g.moveTo(-0.15 + lean, -1.3); g.quadraticCurveTo(lean, -1.05, 0.15 + lean, -1.3); g.closePath(); finish(P.flag, null, true);
+        rect(-0.25, -0.86, 0.5, 0.07, P.metal, 0.02, true);
+        break;
+    }
+  }
+
+  // ---------------------------------------------------------------- shields
+  function shield(kind, x, y, sz) {
+    g.save(); g.translate(x, y);
+    switch (kind) {
+      case 'scutum': {
+        rect(-0.46 * sz, -0.62 * sz, 0.92 * sz, 1.24 * sz, P.body, 0.2 * sz);
+        rect(-0.46 * sz, -0.62 * sz, 0.92 * sz, 0.07 * sz, P.metal, 0.03, true); rect(-0.46 * sz, 0.55 * sz, 0.92 * sz, 0.07 * sz, P.metal, 0.03, true);
+        rect(-0.05 * sz, -0.55 * sz, 0.1 * sz, 1.1 * sz, P.acc, 0.02, true);
+        ell(0, 0, 0.17 * sz, 0.17 * sz, P.metal); ell(0, 0, 0.07 * sz, 0.07 * sz, hi(P.metal), 0, true);
+        break;
+      }
+      case 'round': { // viking: planks, boss
+        ell(0, 0, 0.55 * sz, 0.55 * sz, P.cloth);
+        g.save(); g.beginPath(); g.arc(0, 0, 0.55 * sz, 0, 6.2832); g.clip();
+        g.fillStyle = col(P.body); g.fillRect(-0.55 * sz, -0.55 * sz, 0.55 * sz, 1.1 * sz); g.restore();
+        g.strokeStyle = col(P.dark); g.lineWidth = LW * 1.2; g.beginPath(); g.moveTo(-0.55 * sz, 0); g.lineTo(0.55 * sz, 0); g.moveTo(0, -0.55 * sz); g.lineTo(0, 0.55 * sz); g.stroke();
+        g.beginPath(); g.arc(0, 0, 0.55 * sz, 0, 6.2832); g.lineWidth = LW * 1.4; g.strokeStyle = col(LN); g.stroke();
+        ell(0, 0, 0.14 * sz, 0.14 * sz, P.steel); dot(0.04 * sz, -0.04 * sz, 0.04 * sz, '#fff');
+        break;
+      }
+      case 'dhal': {
+        ell(0, 0, 0.5 * sz, 0.5 * sz, P.dark);
+        ell(0, 0, 0.38 * sz, 0.38 * sz, P.body, 0, true);
+        for (let i = 0; i < 4; i++) { const a = i * 1.5708 + 0.78; dot(Math.cos(a) * 0.27 * sz, Math.sin(a) * 0.27 * sz, 0.055 * sz, P.metal); }
+        ell(0, 0, 0.13 * sz, 0.13 * sz, P.metal); dot(0, 0, 0.04 * sz, P.dark);
+        break;
+      }
+      case 'chimalli': {
+        for (let i = 0; i < 14; i++) { const a = i / 14 * 6.2832; g.save(); g.translate(Math.cos(a) * 0.52 * sz, Math.sin(a) * 0.52 * sz); g.rotate(a + 1.5708); ell(0, -0.04, 0.06 * sz, 0.14 * sz, i % 3 === 0 ? P.metal : (i % 3 === 1 ? P.flag : P.acc), 0, true); g.restore(); }
+        ell(0, 0, 0.47 * sz, 0.47 * sz, P.cloth);
+        ell(0, 0, 0.34 * sz, 0.34 * sz, P.body, 0, true);
+        ell(0, 0, 0.2 * sz, 0.2 * sz, P.metal, 0, true);
+        poly([0, -0.46 * sz, 0.07 * sz, 0, 0, 0.46 * sz, -0.07 * sz, 0], P.acc, true); poly([-0.46 * sz, 0, 0, -0.07 * sz, 0.46 * sz, 0, 0, 0.07 * sz], P.acc, true);
+        break;
+      }
+      case 'tate': {
+        rect(-0.44 * sz, -0.62 * sz, 0.88 * sz, 1.24 * sz, '#c9a26a');
+        g.strokeStyle = col('#8a6a3c'); g.lineWidth = LW; g.beginPath(); for (let i = -1; i <= 1; i++) { g.moveTo(i * 0.28 * sz, -0.62 * sz); g.lineTo(i * 0.28 * sz, 0.62 * sz); } g.stroke();
+        rect(-0.44 * sz, -0.62 * sz, 0.88 * sz, 0.1 * sz, P.dark, 0.02, true);
+        ell(0, -0.02 * sz, 0.2 * sz, 0.2 * sz, P.body, 0, true); ell(0, -0.02 * sz, 0.09 * sz, 0.09 * sz, P.cloth, 0, true);
+        break;
+      }
+      case 'tall': { // egyptian hide body shield
+        g.beginPath(); g.moveTo(-0.4 * sz, 0.62 * sz); g.lineTo(-0.4 * sz, -0.3 * sz); g.quadraticCurveTo(-0.4 * sz, -0.7 * sz, 0, -0.7 * sz); g.quadraticCurveTo(0.4 * sz, -0.7 * sz, 0.4 * sz, -0.3 * sz); g.lineTo(0.4 * sz, 0.62 * sz); g.closePath();
+        finish('#e8dcc0', [-0.4 * sz, -0.7 * sz, 0.8 * sz, 1.32 * sz]);
+        g.save(); g.clip(); for (const p of [[-0.2, -0.3], [0.2, 0.0], [-0.15, 0.3], [0.18, -0.45]]) ell(p[0] * sz, p[1] * sz, 0.12 * sz, 0.17 * sz, '#7a5230', 0.3, true); g.restore();
+        g.lineWidth = LW * 1.6; g.strokeStyle = col(P.flag); g.stroke();
+        rect(-0.04 * sz, -0.7 * sz, 0.08 * sz, 1.3 * sz, P.wood, 0.02, true);
+        break;
+      }
+      case 'buckler': { ell(0, 0, 0.3 * sz, 0.3 * sz, P.metal); ell(0, 0, 0.1 * sz, 0.1 * sz, hi(P.metal), 0, true); break; }
+    }
+    g.restore();
+  }
+
+  // ---------------------------------------------------------------- horse and mounts
+  function horse(coat, cloth, o) {
+    o = o || {};
+    const sw = o.still ? 0 : SW * (o.fast ? 1.35 : 1);
+    const dark = lo(coat);
+    const A = sw * 0.28, B = -sw * 0.28;
+    const legs = [[-0.52, A, 0], [-0.34, B, 0], [0.34, A, 0], [0.52, B, 0]];
+    for (const L of legs) {
+      const lift = L[1] > 0 ? L[1] * 0.35 : 0;
+      limb(L[0], -0.62, L[0] + L[1], -lift, 0.14, dark);
+      ell(L[0] + L[1] + 0.03, -lift - 0.02, 0.1, 0.05, '#2a1c14', 0, true);
+    }
+    poly([-0.66, -0.98, -0.78, -0.85, -1.1 - sw * 0.05, -0.4, -0.98, -0.34, -0.7, -0.74], dark); // tail
+    ell(0, -0.78, 0.74, 0.32, coat); // barrel
+    poly([0.5, -0.9, 0.7, -1.5, 0.98, -1.46, 0.78, -0.62], coat); // neck
+    poly([0.62, -1.02, 0.72, -1.52, 0.6, -1.5, 0.46, -0.98], dark); // mane
+    poly([0.9, -1.56, 1.32, -1.26, 1.26, -1.1, 0.9, -1.3], coat); // head
+    poly([0.92, -1.56, 0.94, -1.72, 1.02, -1.56], dark, true); // ear
+    dot(1.02, -1.4, 0.03, '#fff');
+    ell(1.28, -1.17, 0.05, 0.05, dark, 0, true);
+    if (cloth) { // trapper
+      poly([-0.5, -1.08, 0.46, -1.08, 0.5, -0.5, 0.36, -0.42, -0.36, -0.42, -0.52, -0.5], cloth);
+      rect(-0.5, -0.56, 1.0, 0.06, o.trim || P.acc, 0, true);
+    }
+  }
+  function sitLegs() { /* handled by person legs:'sit' */ }
+
+  // ---------------------------------------------------------------- the six roles per civ
+  function shieldRole() {
+    const sw = SW;
+    const tun = P.body;
+    const o = { k: 1.0, y: 0, stance: 'wide', hl: [-0.1, -0.9], hr: [0.45, -0.95], tunic: tun, noskirt: false };
+    const hats = { rome: 'galea', vikings: 'vhelm', marathas: 'pagdi', aztecs: 'jaguar', samurai: 'jingasa', egypt: 'wig' };
+    o.hat = hats[CV];
+    if (CV === 'vikings') o.beard = true;
+    const kind = { rome: 'scutum', vikings: 'round', marathas: 'dhal', aztecs: 'chimalli', samurai: 'tate', egypt: 'tall' }[CV];
+    o.back = function () {
+      if (CV === 'samurai') weapon('yari', 0.5, -0.8, 0.12, 1.9);
+      if (CV === 'egypt') weapon('spear', 0.5, -0.9, 0.1, 1.2);
+      if (CV === 'vikings') weapon('axe', 0.55, -0.9, 0.12, 1.0);
+    };
+    o.front = function () {
+      const sx = (CV === 'marathas') ? -0.05 : -0.02;
+      const sz = { scutum: 1.0, round: 0.95, dhal: 1.15, chimalli: 1.0, tate: 1.0, tall: 1.0 }[kind];
+      shield(kind, sx, -0.8, sz);
+      // civ weapon in the free hand
+      if (CV === 'rome') weapon('gladius', 0.5, -0.95, 0.9, 0.75);
+      if (CV === 'marathas') weapon('talwar', 0.5, -0.85, 0.35, 1.0);
+      if (CV === 'aztecs') weapon('macua', 0.55, -0.85, 0.4, 0.9);
+    };
+    person(o);
+  }
+
+  function bladeRole(hero) {
+    const hats = { rome: 'gladiator', vikings: 'wild', marathas: 'pagdi', aztecs: 'eagle', samurai: 'kabuto', egypt: 'nemes' };
+    const o = { k: 1, stance: 'lunge', lean: 0.14, hat: hats[CV], big: !!hero, tunic: P.body };
+    if (CV === 'rome') { o.tunic = P.body; }
+    if (CV === 'vikings') { o.tunic = P.dark; o.back = function () { poly([-0.34, -1.3, 0.34, -1.3, 0.42, -0.5, -0.42, -0.5], '#5a4430'); }; }
+    if (CV === 'aztecs') o.back = function () { for (let i = 0; i < 4; i++) { g.save(); g.translate(-0.3, -1.1); g.rotate(-1.9 + i * 0.35); ell(0, -0.4, 0.09, 0.34, [P.flag, P.metal, P.acc, P.body][i], 0, true); g.restore(); } };
+    const twoHand = CV === 'samurai' || CV === 'vikings';
+    o.hl = twoHand ? [0.38, -1.5] : [-0.45, -1.1];
+    o.hr = twoHand ? [0.56, -1.82] : [0.5, -1.62];
+    o.front = function (hl, hr) {
+      if (CV === 'rome') { weapon('gladius', hr[0], hr[1], 0.55, 1.0); shield('buckler', -0.5, -1.0, 1); }
+      else if (CV === 'vikings') weapon('axe', 0.46, -1.55, 0.5, 1.3);
+      else if (CV === 'marathas') weapon('dand', hr[0], hr[1], 0.5, 1.35);
+      else if (CV === 'aztecs') weapon('macua', hr[0], hr[1], 0.55, 1.2);
+      else if (CV === 'samurai') weapon('katana', 0.46, -1.65, 0.6, 1.45);
+      else if (CV === 'egypt') { weapon('khopesh', hr[0], hr[1], 0.45, 1.1); shield('buckler', -0.52, -1.05, 0.9); }
+    };
+    person(o);
+  }
+
+  function swarmRole() {
+    const hats = { rome: 'galea', vikings: 'vhelm', marathas: 'pagdi', aztecs: 'none', samurai: 'jingasa', egypt: 'linen' };
+    const spots = [[-0.58, -0.05, 0], [0.56, -0.05, 2], [-0.02, 0.24, 1]];
+    for (const sp of spots) {
+      const sv = SW; SW = Math.sin(PHASE + sp[2] * 2.1);
+      const o = { k: 0.6, x: sp[0], y: sp[1], hat: hats[CV], tunic: CV === 'vikings' ? P.dark : P.body, hl: [-0.36, -0.95], hr: [0.38, -1.5 + SW * 0.08] };
+      o.front = function (hl, hr) {
+        if (CV === 'rome') weapon('spear', hr[0], hr[1], 0.1, 1.0);
+        else if (CV === 'vikings') weapon('axe', hr[0], hr[1], 0.3, 0.7);
+        else if (CV === 'marathas') weapon('talwar', hr[0], hr[1], 0.3, 0.8);
+        else if (CV === 'aztecs') weapon('spear', hr[0], hr[1], 0.1, 1.0);
+        else if (CV === 'samurai') weapon('yari', hr[0], hr[1], 0.05, 1.5);
+        else weapon('khopesh', hr[0], hr[1], 0.3, 0.8);
+        if (CV === 'rome') shield('round', -0.34, -0.95, 0.4);
+      };
+      person(o); SW = sv;
+    }
+  }
+
+  function bowRole() {
+    const hats = { rome: 'galea', vikings: 'vhelm', marathas: 'pagdi', aztecs: 'feathers', samurai: 'jingasa', egypt: 'wig' };
+    const o = { k: 0.95, hat: hats[CV], lean: -0.04, stance: 'wide', beard: CV === 'vikings' };
+    if (CV === 'vikings') o.tunic = P.body;
+    const bowStyle = CV;
+    if (CV === 'marathas') { o.hr = [0.34, -1.0]; o.hl = [0.92, -1.12]; }
+    else if (CV === 'aztecs') { o.hr = [0.34, -1.9]; o.hl = [-0.42, -1.05]; }
+    else if (CV === 'samurai') { o.hl = [0.95, -1.15]; o.hr = [0.05, -1.2]; }
+    else { o.hl = [0.88, -1.18]; o.hr = [0.12, -1.18]; }
+    o.front = function (hl, hr) {
+      if (CV === 'rome' || CV === 'egypt') {
+        const bx = hl[0];
+        const h = CV === 'rome' ? 0.62 : 0.7;
+        const pts = [bx + 0.12, -1.18 - h].concat(bez(bx + 0.12, -1.18 - h, bx - 0.12, -1.18 - h * 0.55, bx + 0.08, -1.18, 5), bez(bx + 0.08, -1.18, bx - 0.12, -1.18 + h * 0.55, bx + 0.12, -1.18 + h, 5));
+        trail(pts, 0.065, P.wood);
+        g.strokeStyle = col('#f6efe0'); g.lineWidth = LW * 0.7; g.beginPath(); g.moveTo(bx + 0.12, -1.18 - h); g.lineTo(hr[0], hr[1]); g.lineTo(bx + 0.12, -1.18 + h); g.stroke();
+        limb(hr[0], hr[1], bx + 0.3, -1.18, 0.035, P.wood);
+        poly([bx + 0.5, -1.18, bx + 0.3, -1.23, bx + 0.3, -1.13], P.steel, true);
+      } else if (CV === 'vikings') {
+        const bx = hl[0] + 0.02, h = 0.9;
+        const pts = bez(bx + 0.1, -1.18 - h, bx - 0.14, -1.18 - h * 0.4, bx, -1.18, 5).concat(bez(bx, -1.18, bx - 0.14, -1.18 + h * 0.4, bx + 0.1, -1.18 + h, 5));
+        trail(pts, 0.06, P.wood);
+        g.strokeStyle = col('#f6efe0'); g.lineWidth = LW * 0.7; g.beginPath(); g.moveTo(bx + 0.1, -1.18 - h); g.lineTo(hr[0], hr[1]); g.lineTo(bx + 0.1, -1.18 + h); g.stroke();
+        limb(hr[0], hr[1], bx + 0.35, -1.18, 0.035, P.wood);
+      } else if (CV === 'samurai') {
+        const bx = hl[0], top = -2.35, bot = -0.2;
+        const pts = bez(bx + 0.05, top, bx - 0.2, -1.55, bx, -1.15, 6).concat(bez(bx, -1.15, bx - 0.12, -0.6, bx + 0.05, bot, 5));
+        trail(pts, 0.06, P.wood);
+        g.strokeStyle = col('#f6efe0'); g.lineWidth = LW * 0.7; g.beginPath(); g.moveTo(bx + 0.05, top); g.lineTo(hr[0], hr[1]); g.lineTo(bx + 0.05, bot); g.stroke();
+        limb(hr[0], hr[1], bx + 0.3, -1.15, 0.03, P.wood);
+      } else if (CV === 'marathas') { // matchlock musket held out
+        trail([-0.1, -0.92, 0.5, -1.0, 1.35, -1.12], 0.085, P.wood);
+        trail([0.5, -1.0, 1.55, -1.14], 0.05, '#4a4f58');
+        poly([-0.08, -0.98, -0.28, -0.88, -0.2, -0.78, -0.02, -0.86], P.wood, true);
+        dot(1.55, -1.14, 0.05, '#d9d4c6'); dot(0.55, -1.06, 0.05, P.acc);
+        // curl of match smoke
+        g.strokeStyle = col('#cfc8b8'); g.globalAlpha = 0.6; g.lineWidth = LW * 1.4; g.beginPath(); g.moveTo(0.55, -1.12); g.quadraticCurveTo(0.45, -1.4, 0.58, -1.55); g.stroke(); g.globalAlpha = 1;
+      } else if (CV === 'aztecs') { // atlatl and dart held back, ready to throw
+        trail([0.1, -2.05, 0.7, -2.2, 1.45, -2.55], 0.05, P.wood);
+        poly([1.45, -2.55, 1.62, -2.7, 1.38, -2.7], P.steel, true);
+        trail([0.32, -1.9, 0.08, -1.98], 0.05, P.wood);
+        // second dart quiver
+        rect(-0.5, -1.3, 0.18, 0.7, P.wood, 0.05); for (let i = 0; i < 3; i++) limb(-0.46 + i * 0.05, -1.3, -0.44 + i * 0.05, -1.5, 0.03, P.flag);
+      }
+    };
+    person(o);
+  }
+
+  function horseRole() {
+    if (CV === 'vikings') return longship();
+    if (CV === 'egypt') return chariot();
+    if (CV === 'aztecs') return runner();
+    const tw = CV === 'samurai' ? '#3a2a22' : (CV === 'rome' ? '#7a5638' : '#5a3a26');
+    horse(CV === 'marathas' ? '#e9e2d0' : tw, null, { fast: true });
+    // saddle cloth and trim
+    poly([-0.3, -1.04, 0.32, -1.04, 0.34, -0.5, -0.32, -0.5], CV === 'rome' ? P.body : (CV === 'samurai' ? P.body : P.flag));
+    rect(-0.32, -0.56, 0.66, 0.06, P.acc, 0, true);
+    // rider
+    const hats = { rome: 'galea', marathas: 'pagdi', samurai: 'kabuto' };
+    const o = { k: 0.7, x: 0.02, y: -0.5, legs: 'sit', hat: hats[CV], tunic: CV === 'samurai' ? P.body : P.body, hl: [0.5, -0.9], hr: [0.45, -1.4], still: true, noskirt: true, legc: P.dark, lean: -0.05 };
+    if (CV === 'samurai') { o.hl = [0.55, -1.25]; o.hr = [0.15, -1.25]; }
+    o.front = function (hl, hr) {
+      if (CV === 'rome') { weapon('spear', hr[0], hr[1], 0.95, 1.5); shield('round', -0.42, -0.95, 0.55); }
+      else if (CV === 'marathas') { weapon('spear', hr[0], hr[1], 0.95, 1.7); poly([hr[0] + 0.56, hr[1] - 1.1, hr[0] + 1.1, hr[1] - 1.25, hr[0] + 0.9, hr[1] - 1.0, hr[0] + 1.1, hr[1] - 0.82, hr[0] + 0.5, hr[1] - 0.95], P.flag); }
+      else { // yabusame bow held out
+        const bx = hl[0] + 0.1, h = 0.75;
+        const pts = bez(bx, -1.25 - h, bx - 0.25, -1.55, bx, -1.25, 5).concat(bez(bx, -1.25, bx - 0.15, -0.85, bx, -1.25 + h * 0.5, 5));
+        trail(pts, 0.06, P.wood);
+        g.strokeStyle = col('#f6efe0'); g.lineWidth = LW * 0.7; g.beginPath(); g.moveTo(bx, -1.25 - h); g.lineTo(hr[0], hr[1]); g.lineTo(bx, -1.25 + h * 0.5); g.stroke();
+      }
+    };
+    person(o);
+    if (CV === 'samurai') { // horo cloak streaming
+      poly([-0.2, -1.4, -0.9, -1.5 - SW * 0.05, -1.0, -0.95, -0.25, -0.95], P.flag);
+    }
+  }
+
+  function runner() { // Aztec runner: leaning sprint, feather back-pack, speed lines
+    g.strokeStyle = col(P.cloth); g.globalAlpha = 0.45; g.lineWidth = LW * 1.8; g.lineCap = 'round';
+    for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(-0.6 - i * 0.2, -0.5 - i * 0.45); g.lineTo(-1.35 - i * 0.2, -0.5 - i * 0.45); g.stroke(); }
+    g.globalAlpha = 1; g.lineCap = 'butt';
+    const sw = SW;
+    const o = { k: 1.02, lean: 0.3, still: true, hat: 'feathers', stance: 'lunge', tunic: P.body, noskirt: false };
+    o.back = function () { for (let i = 0; i < 4; i++) { g.save(); g.translate(-0.15, -1.15); g.rotate(-1.7 - i * 0.18); ell(0, -0.42, 0.09, 0.4, [P.flag, P.metal, P.acc, P.flag][i], 0, true); g.restore(); } };
+    o.hl = [-0.5, -1.05 + sw * 0.2]; o.hr = [0.68, -1.12 - sw * 0.2];
+    o.front = function (hl, hr) { weapon('macua', hr[0], hr[1], 1.15, 0.8); };
+    // alternate legs by hand since still=true
+    person(o);
+  }
+
+  function longship() {
+    const sw = SW;
+    // warriors first so the hull overlaps them
+    for (const X of [-0.55, 0.05, 0.62]) person({ k: 0.55, x: X, y: -0.42, still: true, hat: 'vhelm', beard: true, tunic: P.dark, legs: 'none', hl: [-0.3, -0.9], hr: [0.3, -1.2] });
+    // sail and mast
+    rect(-0.04, -2.35, 0.08, 1.7, P.wood, 0.02, true);
+    poly([-0.8, -2.3, 0.8, -2.3, 0.7, -1.2, -0.7, -1.2], P.cloth);
+    g.save(); g.beginPath(); g.moveTo(-0.8, -2.3); g.lineTo(0.8, -2.3); g.lineTo(0.7, -1.2); g.lineTo(-0.7, -1.2); g.closePath(); g.clip();
+    g.fillStyle = col(P.body); for (let i = -4; i < 4; i += 2) g.fillRect(i * 0.2, -2.35, 0.2, 1.2); g.restore();
+    poly([-0.8, -2.3, 0.8, -2.3, 0.7, -1.2, -0.7, -1.2], 'rgba(0,0,0,0)', true);
+    rect(-0.88, -2.38, 1.76, 0.08, P.wood, 0.03, true);
+    // hull
+    poly([-1.38, -1.2, -1.15, -0.55, -0.65, -0.18, 0.7, -0.18, 1.15, -0.5, 1.3, -1.0, 0.9, -0.74, 0, -0.64, -0.95, -0.76], P.dark);
+    poly([-1.18, -0.62, -0.62, -0.28, 0.7, -0.28, 1.12, -0.58, 0.9, -0.74, 0, -0.64, -0.95, -0.76], P.wood);
+    // shields
+    for (let i = 0; i < 6; i++) { const x = -0.85 + i * 0.3, y = -0.72 + Math.abs(x) * 0.05; ell(x, y, 0.13, 0.13, i % 2 ? P.cloth : P.body); dot(x, y, 0.035, P.steel); }
+    // dragon prow and stern curl
+    trail([1.15, -0.8, 1.3, -1.2, 1.32, -1.55, 1.45, -1.75], 0.12, P.wood);
+    poly([1.3, -1.82, 1.62, -1.78, 1.7, -1.62, 1.5, -1.66, 1.46, -1.55, 1.3, -1.6], P.acc);
+    dot(1.42, -1.74, 0.03, '#fff');
+    trail([-1.15, -0.8, -1.38, -1.2, -1.42, -1.55, -1.28, -1.62], 0.1, P.wood);
+    // oars
+    g.lineCap = 'round';
+    for (let i = 0; i < 4; i++) { const x = -0.7 + i * 0.5, sx = Math.sin(PHASE + i * 0.5) * 0.15; limb(x, -0.55, x - 0.35 + sx, 0.1, 0.05, P.wood); }
+    // water
+    g.fillStyle = col('#3f87b0'); g.beginPath(); g.moveTo(-1.5, 0.05);
+    for (let i = 0; i <= 12; i++) g.lineTo(-1.5 + i * 0.26, -0.12 + Math.sin(PHASE * 0.8 + i * 1.4) * 0.05);
+    g.lineTo(1.8, 0.1); g.closePath(); g.fill(); g.lineWidth = LW; g.strokeStyle = col(LN); g.stroke();
+    g.strokeStyle = col('#d8f0ff'); g.lineWidth = LW * 1.3; g.beginPath(); g.moveTo(1.2, -0.08); g.lineTo(1.5, -0.14); g.moveTo(-1.3, -0.1); g.lineTo(-1.0, -0.14); g.stroke();
+  }
+
+  function chariot() {
+    const sw = SW;
+    g.save(); g.translate(-0.55, 0); // chariot body at left, horse at right
+    // pole and yoke
+    limb(0.3, -0.55, 1.35, -0.78, 0.07, P.wood);
+    // car
+    poly([-0.5, -0.5, 0.52, -0.5, 0.52, -1.18, 0.32, -1.3, 0.22, -1.0, -0.5, -0.9], P.metal);
+    poly([-0.5, -0.9, 0.22, -1.0, 0.32, -1.3, 0.52, -1.18, 0.52, -0.9], P.flag);
+    rect(-0.5, -0.56, 1.02, 0.07, P.wood, 0.02, true);
+    // wheel
+    wheel(-0.05, -0.42, 0.42, PHASE * 0.9, P.wood, 5);
+    // crew
+    person({ k: 0.55, x: -0.18, y: -0.62, still: true, legs: 'none', hat: 'nemes', tunic: P.cloth, hl: [-0.2, -0.95], hr: [0.4, -1.0], noskirt: true,
+      front: function () { } });
+    person({ k: 0.55, x: 0.22, y: -0.62, still: true, legs: 'none', hat: 'wig', tunic: P.cloth, hl: [0.55, -1.25], hr: [0.1, -1.25], noskirt: true,
+      front: function () {
+        const bx = 0.55, top = -1.25 - 0.55 * 0.55;
+        trail(bez(0.5, -1.7, 0.3, -1.3, 0.5, -1.0, 4), 0.04, P.wood);
+      } });
+    g.restore();
+    g.save(); g.translate(0.95, 0); g.scale(0.88, 0.88);
+    horse('#7a5638', P.flag, { fast: true, trim: P.metal });
+    // plume
+    g.save(); g.translate(0.95, -1.64); for (let i = 0; i < 3; i++) { g.save(); g.rotate(-0.4 + i * 0.35); ell(0, -0.18, 0.05, 0.2, i === 1 ? P.metal : P.flag, 0, true); g.restore(); } g.restore();
+    g.restore();
+    wheel(-0.55 + 0.0, -0.42, 0.0001, 0, P.wood, 0);
+  }
+
+  function siegeRole() {
+    const sw = SW;
+    if (CV === 'rome') { // ballista on a wheeled frame
+      wheel(-0.55, -0.34, 0.34, PHASE * 0.5, P.wood, 4); wheel(0.55, -0.34, 0.34, PHASE * 0.5, P.wood, 4);
+      rect(-0.75, -0.72, 1.5, 0.2, P.wood, 0.04);
+      poly([-0.5, -0.72, 0.5, -0.72, 0.4, -1.0, -0.4, -1.0], P.wood);
+      // torsion springs and arms
+      rect(-0.55, -1.25, 0.26, 0.38, P.metal, 0.08); rect(0.29, -1.25, 0.26, 0.38, P.metal, 0.08);
+      trail([-0.42, -1.1, -0.1, -1.42, 0.0, -1.0], 0.08, P.wood); trail([0.42, -1.1, 0.1, -1.42, 0.0, -1.0], 0.08, P.wood);
+      g.strokeStyle = col('#f6efe0'); g.lineWidth = LW; g.beginPath(); g.moveTo(-0.1, -1.42); g.lineTo(0.0, -0.95); g.lineTo(0.1, -1.42); g.stroke();
+      limb(-0.1, -1.0, 1.1, -1.55, 0.08, P.wood); poly([1.1, -1.55, 0.95, -1.7, 1.45, -1.72], P.steel);
+      poly([-0.3, -0.72, -0.9, -0.72, -0.9, -0.55, -0.3, -0.55], P.dark, true);
+      poly([-0.6, -1.6, -0.6, -1.0, -0.2, -1.0], P.body, true);
+    } else if (CV === 'vikings') { // battering ram under a hide roof
+      wheel(-0.6, -0.3, 0.3, PHASE * 0.5, P.wood, 4); wheel(0.5, -0.3, 0.3, PHASE * 0.5, P.wood, 4);
+      rect(-0.9, -0.62, 1.8, 0.14, P.wood, 0.04);
+      limb(-0.6, -0.48, -0.6, -0.8, 0.09, P.wood); limb(0.5, -0.48, 0.5, -0.8, 0.09, P.wood);
+      limb(-0.9 + SW * 0.1, -0.78, 1.45 + SW * 0.1, -0.78, 0.26, '#6b4a2b'); // log
+      poly([1.3 + SW * 0.1, -0.95, 1.7 + SW * 0.1, -0.78, 1.3 + SW * 0.1, -0.6], P.metal);
+      poly([-1.0, -0.98, 0, -1.75, 0.95, -0.98], P.cloth); // roof
+      g.save(); g.beginPath(); g.moveTo(-1.0, -0.98); g.lineTo(0, -1.75); g.lineTo(0.95, -0.98); g.closePath(); g.clip();
+      g.fillStyle = col(P.body); for (let i = -3; i < 3; i += 2) { g.beginPath(); g.moveTo(i * 0.18, -1.75); g.lineTo(i * 0.18 + 0.18, -1.75); g.lineTo(i * 0.18 + 0.35, -0.98); g.lineTo(i * 0.18 + 0.1, -0.98); g.fill(); } g.restore();
+      poly([-1.0, -0.98, 0, -1.75, 0.95, -0.98], 'rgba(0,0,0,0)', true);
+    } else if (CV === 'marathas') { // rocket cart
+      wheel(-0.15, -0.5, 0.5, PHASE * 0.6, P.wood, 6);
+      rect(-0.85, -0.82, 1.6, 0.22, P.dark, 0.04);
+      limb(0.7, -0.7, 1.4, -0.5, 0.08, P.wood);
+      // rack
+      for (let i = 0; i < 4; i++) {
+        const x = -0.6 + i * 0.28;
+        g.save(); g.translate(x, -0.9); g.rotate(0.55);
+        rect(-0.065, -0.9, 0.13, 0.85, P.cloth, 0.04);
+        poly([-0.065, -0.9, 0.065, -0.9, 0, -1.08], P.flag, true);
+        g.restore();
+      }
+      poly([-0.7, -0.92, 0.55, -0.92, 0.55, -0.82, -0.7, -0.82], P.wood);
+      // spark
+      dot(0.28 + 0.02 * SW, -1.45, 0.07, '#ffd66a'); dot(0.28, -1.45, 0.035, '#fff');
+    } else if (CV === 'aztecs') { // two fire bearers with a burning log
+      limb(-0.8, -0.98, 0.95, -1.0, 0.2, '#6b4a2b');
+      const fl = 0.08 * Math.sin(PHASE * 2);
+      poly([0.95, -1.15, 1.05, -1.55 - fl, 1.2, -1.2, 1.3, -1.7 - fl, 1.45, -1.1, 1.4, -0.85, 0.95, -0.85], P.flag);
+      poly([1.0, -1.05, 1.15, -1.35 - fl, 1.25, -1.05, 1.3, -0.9, 1.0, -0.9], '#ffd35a', true);
+      for (const X of [-0.55, 0.3]) person({ k: 0.72, x: X, y: 0, hat: 'feathers', hl: [-0.2, -1.0], hr: [0.35, -1.12], tunic: P.body });
+    } else if (CV === 'samurai') { // ozutsu on a wheeled stand
+      wheel(-0.45, -0.34, 0.34, PHASE * 0.5, P.wood, 4); wheel(0.5, -0.34, 0.34, PHASE * 0.5, P.wood, 4);
+      rect(-0.85, -0.68, 1.7, 0.16, P.wood, 0.04);
+      poly([-0.2, -0.68, 0.3, -0.68, 0.2, -1.0, -0.1, -1.0], P.wood);
+      // barrel: big bronze tube with flared muzzle
+      g.save(); g.translate(0.0, -1.2); g.rotate(-0.12);
+      poly([-0.7, -0.15, 0.55, -0.2, 0.62, -0.28, 0.9, -0.36, 0.9, 0.36, 0.62, 0.28, 0.55, 0.2, -0.7, 0.18], '#8a5a2c');
+      rect(-0.5, -0.17, 0.12, 0.34, P.metal, 0.02, true); rect(0.05, -0.19, 0.12, 0.38, P.metal, 0.02, true);
+      g.restore();
+      dot(0.95, -1.38, 0.1 + 0.03 * SW, '#ffc65a'); dot(0.95, -1.38, 0.04, '#fff');
+      person({ k: 0.62, x: -0.65, y: -0.62, still: true, legs: 'none', hat: 'jingasa', hl: [0.4, -1.05], hr: [0.62, -1.1], tunic: P.body });
+    } else { // egypt: obelisk ram on rollers
+      for (let i = 0; i < 3; i++) wheel(-0.75 + i * 0.7, -0.22, 0.22, PHASE * 0.8 + i, P.wood, 3);
+      rect(-1.05, -0.5, 2.3, 0.2, P.wood, 0.05);
+      poly([-1.0, -0.92, 0.75, -0.98, 1.1, -0.76, 0.75, -0.54, -1.0, -0.5], '#e4d3a3'); // obelisk
+      poly([0.75, -0.98, 1.5, -0.76, 0.75, -0.54], P.metal);
+      rect(-0.9, -0.85, 1.55, 0.06, P.flag, 0, true); rect(-0.9, -0.62, 1.55, 0.05, P.flag, 0, true);
+      g.strokeStyle = col(P.dark); g.lineWidth = LW; g.beginPath(); for (let i = 0; i < 6; i++) { g.moveTo(-0.8 + i * 0.25, -0.77); g.lineTo(-0.75 + i * 0.25, -0.71); } g.stroke();
+      trail([-1.0, -0.9, -1.3, -0.5, -1.0, -0.4], 0.04, P.wood);
+      person({ k: 0.55, x: -0.6, y: -0.52, still: true, legs: 'none', hat: 'nemes', hl: [-0.2, -1.0], hr: [0.3, -1.0], noskirt: true });
+    }
+  }
+
+  // ---------------------------------------------------------------- heroes
+  function heroRole() {
+    const hat = { rome: 'crest', vikings: 'vhelm', marathas: 'pagdi', aztecs: 'eagle', samurai: 'kabuto', egypt: 'nemes' }[CV];
+    const o = { k: 1, stance: 'lunge', lean: 0.1, hat: hat, big: true, beard: CV === 'vikings' };
+    // standard behind the hero
+    const poleX = CV === 'egypt' ? -0.8 : -0.55;
+    o.back = function () {
+      limb(poleX, -0.1, poleX, -2.45, 0.07, P.wood);
+      dot(poleX, -2.5, 0.07, P.acc);
+      const w = Math.sin(PHASE * 0.8) * 0.08;
+      if (CV === 'rome') { rect(poleX - 0.3, -2.35, 0.6, 0.5, P.body, 0.02); rect(poleX - 0.3, -2.35, 0.6, 0.06, P.metal, 0, true); dot(poleX, -2.1, 0.1, P.metal); }
+      else if (CV === 'vikings') { poly([poleX, -2.4, poleX - 0.9, -2.2 + w, poleX - 0.75, -2.0, poleX - 0.9, -1.78 - w, poleX, -1.8], P.flag); poly([poleX - 0.2, -2.12, poleX - 0.5, -2.2, poleX - 0.35, -2.0], '#8a93a0', true); }
+      else if (CV === 'marathas') { poly([poleX, -2.4, poleX - 1.1, -2.15 + w, poleX - 0.75, -2.0, poleX - 1.1, -1.8 - w, poleX, -1.65], P.flag); dot(poleX - 0.35, -2.02, 0.08, P.acc); }
+      else if (CV === 'aztecs') { for (let i = 0; i < 6; i++) { g.save(); g.translate(poleX, -2.4); g.rotate(-1.0 + i * 0.4); ell(0, -0.35, 0.08, 0.34, [P.flag, P.metal, P.body, P.acc, P.metal, P.flag][i], 0, true); g.restore(); } rect(poleX - 0.18, -2.4, 0.36, 0.1, P.acc, 0.03); }
+      else if (CV === 'samurai') { rect(poleX - 0.28, -2.45, 0.34, 1.0, P.cloth, 0.02); ell(poleX - 0.11, -2.0, 0.1, 0.1, P.flag, 0, true); rect(poleX - 0.28, -2.45, 0.34, 0.06, P.dark, 0, true); }
+      else { ell(poleX, -2.5, 0.22, 0.22, P.metal); g.save(); g.translate(poleX, -2.5); poly([-0.5, 0.02, -0.2, -0.12, -0.2, 0.12], P.flag); poly([0.5, 0.02, 0.2, -0.12, 0.2, 0.12], P.flag); g.restore(); dot(poleX, -2.5, 0.09, P.flag); poly([poleX - 0.06, -2.28, poleX + 0.06, -2.28, poleX + 0.14, -1.8, poleX - 0.14, -1.8], P.cloth, true); }
+      // cloak
+      if (CV === 'rome' || CV === 'egypt') poly([-0.3, -1.3, -0.62, -1.28, -0.7, -0.4 - SW * 0.04, -0.3, -0.7], CV === 'rome' ? P.body : P.flag);
+      if (CV === 'vikings') poly([-0.38, -1.34, 0.4, -1.34, 0.46, -1.1, -0.46, -1.1], '#4a3a2e');
+    };
+    const two = CV === 'samurai' || CV === 'vikings';
+    o.hl = two ? [0.4, -1.45] : [-0.5, -1.15];
+    o.hr = two ? [0.58, -1.8] : [0.55, -1.7];
+    o.front = function (hl, hr) {
+      if (CV === 'rome') { weapon('gladius', hr[0], hr[1], 0.55, 1.15); shield('scutum', -0.52, -0.95, 0.55); }
+      else if (CV === 'vikings') { weapon('axe', 0.48, -1.55, 0.45, 1.5); poly([-0.5, -1.36, -0.3, -1.4, -0.28, -1.15, -0.5, -1.15], '#4a3a2e', true); }
+      else if (CV === 'marathas') { weapon('talwar', hr[0], hr[1], 0.45, 1.5); shield('dhal', -0.52, -1.0, 0.7); }
+      else if (CV === 'aztecs') { weapon('macua', hr[0], hr[1], 0.5, 1.4); shield('chimalli', -0.55, -1.0, 0.65); }
+      else if (CV === 'samurai') { weapon('katana', 0.5, -1.65, 0.55, 1.65); }
+      else if (CV === 'egypt') { weapon('khopesh', hr[0], hr[1], 0.4, 1.3); shield('tall', -0.55, -0.95, 0.65); }
+    };
+    // aura ring
+    g.save(); g.globalAlpha = 0.55; g.lineWidth = LW * 2; g.strokeStyle = col(P.acc); g.beginPath(); g.ellipse(0, 0.02, 0.85, 0.28, 0, 0, 6.2832); g.stroke(); g.restore();
+    if (CV === 'aztecs') { // wings of feathers on the arms
+      g.save(); for (let i = 0; i < 4; i++) { g.save(); g.translate(0.35, -1.2); g.rotate(0.4 + i * 0.28); ell(0.12, -0.15, 0.07, 0.36, [P.flag, P.metal, P.acc, P.body][i], 0, true); g.restore(); } g.restore();
+    }
+    person(o);
+  }
+
+  // ---------------------------------------------------------------- spell fallback
+  function spellFig() {
+    g.save(); g.translate(0, -0.9);
+    for (let i = 0; i < 3; i++) { ell(0, 0, 0.7 - i * 0.2, 0.7 - i * 0.2, i % 2 ? P.acc : P.body, 0, true); }
+    g.restore();
+  }
+
+  // ---------------------------------------------------------------- public: drawFigure
+  const BASE_W = { shield: 0.75, blade: 0.8, swarm: 1.0, bow: 0.8, horse: 1.3, siege: 1.3, hero: 0.95, spell: 0.7 };
+  const HEIGHT = { shield: 1.6, blade: 2.15, swarm: 1.15, bow: 1.8, horse: 2.1, siege: 1.9, spell: 1.4 };
+  const HORSE_H = { rome: 2.05, vikings: 2.5, marathas: 2.4, aztecs: 1.9, samurai: 2.05, egypt: 1.9 };
+  const HERO_SCALE = 1.3;
+
+  function drawFigure(ctx, cardId, side, s, ph, state) {
+    state = state || {};
+    const r = resolve(cardId);
+    const hero = r.role === 'hero' || !!state.hero;
+    const role = hero ? 'hero' : r.role;
+    g = ctx; CV = r.civ; P = palFor(r.civ);
+    HURT = state.hurt || 0; PHASE = ph || 0; SW = Math.sin(PHASE);
+    LN = mix(P.dark, '#0e0a08', 0.62);
+    const face = state.facing === -1 ? -1 : 1;
+    const sc = s * (hero ? HERO_SCALE : 1);
+    LW = Math.max(0.05, 1.05 / sc);
+    g.save();
+    // team ring
+    g.save(); g.scale(s, s);
+    const bw = BASE_W[role] * (hero ? HERO_SCALE : 1);
+    g.lineWidth = Math.max(0.06, 1.4 / s); g.strokeStyle = SIDE_RING[side === 1 ? 1 : 0]; g.globalAlpha = 0.9;
+    g.beginPath(); g.ellipse(0, 0.04, bw * 0.78, bw * 0.24, 0, 0, 6.2832); g.stroke(); g.globalAlpha = 1;
+    g.restore();
+    g.scale(sc * face, sc);
+    g.lineJoin = 'round';
+    try {
+      switch (role) {
+        case 'shield': shieldRole(); break;
+        case 'blade': bladeRole(false); break;
+        case 'swarm': swarmRole(); break;
+        case 'bow': bowRole(); break;
+        case 'horse': horseRole(); break;
+        case 'siege': siegeRole(); break;
+        case 'hero': heroRole(); break;
+        default: spellFig();
+      }
+    } finally { g.restore(); }
+    if (state.buff) { // golden rim light and rising motes
+      g.save(); g.translate(0, 0); g.scale(s, s);
+      g.globalAlpha = 0.85; g.strokeStyle = '#ffd25a'; g.lineWidth = Math.max(0.07, 1.8 / s);
+      g.beginPath(); g.ellipse(0, 0.04, bw * 0.95, bw * 0.3, 0, 0, 6.2832); g.stroke();
+      g.fillStyle = '#ffe9a0';
+      for (let i = 0; i < 4; i++) { const t = ((ph * 0.25 + i * 0.25) % 1), x = (i - 1.5) * 0.35; g.globalAlpha = 1 - t; g.fillRect(x, -0.2 - t * 1.2, 0.07, 0.07); }
+      g.restore(); g.globalAlpha = 1;
+    }
+  }
+
+  function figureHeight(cardId) {
+    const r = resolve(cardId);
+    if (r.role === 'hero') return 2.6 * HERO_SCALE;
+    if (r.role === 'horse') return HORSE_H[r.civ] || 2.1;
+    return HEIGHT[r.role] || 2;
+  }
+  function figureWidth(cardId) { const r = resolve(cardId); return BASE_W[r.role] * 2 * (r.role === 'hero' ? HERO_SCALE : 1); }
+
+  // ---------------------------------------------------------------- role icons (monochrome; uses the ctx fill/stroke already set; centred on 0,0)
+  function drawRoleIcon(ctx, role, size) {
+    const c = ctx, u = size / 24;
+    c.save(); c.scale(u, u);
+    const fs = c.fillStyle, ss = c.strokeStyle;
+    if (ss === '#000000' && fs !== '#000000') c.strokeStyle = fs;
+    c.lineWidth = 2; c.lineJoin = 'round'; c.lineCap = 'round';
+    c.beginPath();
+    switch (role) {
+      case 'shield': // heater shield with boss
+        c.moveTo(-9, -10); c.lineTo(9, -10); c.lineTo(9, 1); c.quadraticCurveTo(9, 9, 0, 12); c.quadraticCurveTo(-9, 9, -9, 1); c.closePath(); c.fill();
+        c.globalCompositeOperation = 'destination-out'; c.beginPath(); c.arc(0, -1, 3.2, 0, 6.2832); c.fill();
+        break;
+      case 'blade': // upright sword, diagonal
+        c.save(); c.rotate(0.7);
+        c.moveTo(0, -12); c.lineTo(2.6, -8); c.lineTo(2.2, 5); c.lineTo(-2.2, 5); c.lineTo(-2.6, -8); c.closePath(); c.fill();
+        c.fillRect(-6.5, 5, 13, 2.8); c.fillRect(-1.6, 7.8, 3.2, 4.5);
+        c.restore();
+        break;
+      case 'swarm': // three small figures
+        for (const p of [[-7, 4], [7, 4], [0, -1]]) { c.beginPath(); c.arc(p[0], p[1] - 5, 2.6, 0, 6.2832); c.fill(); c.beginPath(); c.moveTo(p[0] - 3.6, p[1] + 6); c.lineTo(p[0] - 2.6, p[1] - 2); c.lineTo(p[0] + 2.6, p[1] - 2); c.lineTo(p[0] + 3.6, p[1] + 6); c.closePath(); c.fill(); }
+        break;
+      case 'bow': // bow with nocked arrow
+        c.beginPath(); c.moveTo(-5, -12); c.quadraticCurveTo(9, 0, -5, 12); c.stroke();
+        c.beginPath(); c.lineWidth = 1.2; c.moveTo(-5, -12); c.lineTo(-5, 12); c.stroke();
+        c.beginPath(); c.lineWidth = 2; c.moveTo(-9, 0); c.lineTo(11, 0); c.stroke();
+        c.beginPath(); c.moveTo(12, 0); c.lineTo(7, -3.2); c.lineTo(7, 3.2); c.closePath(); c.fill();
+        break;
+      case 'horse': // horse head in profile
+        c.moveTo(-8, 11); c.lineTo(-6, -2); c.lineTo(-9, -6); c.lineTo(-3, -11); c.lineTo(-3, -7); c.lineTo(1, -10); c.lineTo(6, -3); c.lineTo(12, 3); c.lineTo(11, 7); c.lineTo(5, 6); c.lineTo(1, 4); c.lineTo(2, 11); c.closePath(); c.fill();
+        c.globalCompositeOperation = 'destination-out'; c.beginPath(); c.arc(1.5, -3, 1.5, 0, 6.2832); c.fill();
+        break;
+      case 'siege': // wheel and ram beam
+        c.beginPath(); c.arc(-3, 5, 6, 0, 6.2832); c.stroke();
+        c.beginPath(); c.moveTo(-3, 5); c.lineTo(-3, -1); c.moveTo(-3, 5); c.lineTo(2.2, 8); c.moveTo(-3, 5); c.lineTo(-8.2, 8); c.stroke();
+        c.fillRect(-11, -4, 18, 3.6); c.beginPath(); c.moveTo(7, -5); c.lineTo(12, -2.2); c.lineTo(7, 0.6); c.closePath(); c.fill();
+        break;
+      case 'hero': // crowned star
+        for (let i = 0; i < 10; i++) { const a = -1.5708 + i * 0.6283, r = i % 2 ? 4.6 : 11; c[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r + 1); }
+        c.closePath(); c.fill();
+        break;
+      case 'spell': // flame
+        c.moveTo(0, -12); c.quadraticCurveTo(10, -2, 7, 6); c.quadraticCurveTo(5, 12, 0, 12); c.quadraticCurveTo(-7, 12, -7, 5); c.quadraticCurveTo(-7, 0, -3, -4); c.quadraticCurveTo(-2, -1, 0, 0); c.quadraticCurveTo(-1, -6, 0, -12); c.closePath(); c.fill();
+        break;
+      default: c.arc(0, 0, 8, 0, 6.2832); c.fill();
+    }
+    c.restore();
+  }
+
+  RB.drawFigure = drawFigure;
+  RB.drawRoleIcon = drawRoleIcon;
+  RB.figureHeight = figureHeight;
+  RB.figureWidth = figureWidth;
+  RB.figureInfo = resolve;
+  RB.figureOverride = OVERRIDE;
+})();
+
+</script>
+<script>
+// Epoch. An AZTMM game. (c) 2026 AZTMM HLDGS LLC.
+// 04_render.js: the look. Canvas 2D, flat-shaded figures drawn as paths, no bitmaps.
+// Everything here reads the match (RB.newMatch) and never writes it.
+// Figures come from RB.drawFigure (04_figures.js) when it is loaded; the old drawMan family is the fallback.
+
+(function () {
+"use strict";
+const LOOK = {
+  bg: '#14110e', basalt: '#5a4a3a', basaltDark: '#4a3c2f', basaltLight: '#6b5a48', ledge: '#3b3027',
+  water: '#243f52', waterLight: '#2f5469', bridge: '#9a8b74', bridgeDark: '#6f6354',
+  stone: '#8d8272', stoneDark: '#5e564b', stoneLight: '#b0a48f', rubble: '#4e4740',
+  ink: '#15110d', paper: '#f1e6cf', haze: '#d8c9a8',
+  maratha: { body: '#e8862a', dark: '#9c4f12', cloth: '#f3e1b8', metal: '#cfcbc0', flag: '#f08a1d' },
+  mughal:  { body: '#2e7d4f', dark: '#1b4a30', cloth: '#dfe7d6', metal: '#d9c38a', flag: '#1f6b3f' },
+  epic: '#f5c04a', red: '#c8402f', energy: '#f0b23a', energyDim: '#5a4320',
+  good: '#63d471', bad: '#e5533f'
+};
+
+// ---------- civs and cards, tolerant of the old card set ----------
+const OLD_CIVS = {
+  maratha: { name: 'Marathas', palette: LOOK.maratha, rule: 'old', hero: 'shivaji', blurb: 'Fast, cheap, many. Hill men and light horse.' },
+  mughal:  { name: 'Mughals',  palette: LOOK.mughal,  rule: 'old', hero: 'khan',    blurb: 'Heavy, slow, expensive. Guns and elephants.' }
+};
+const CIV_ORDER = ['rome', 'vikings', 'marathas', 'aztecs', 'samurai', 'egypt'];
+function civTable() { return RB.CIVS || OLD_CIVS; }
+function civKeys() {
+  const ks = Object.keys(civTable());
+  ks.sort(function (a, b) { const ia = CIV_ORDER.indexOf(canon(a)), ib = CIV_ORDER.indexOf(canon(b)); return (ia < 0 ? 9 : ia) - (ib < 0 ? 9 : ib); });
+  return ks;
+}
+function civInfo(key) { const t = civTable(); return t[key] || OLD_CIVS[key] || OLD_CIVS.maratha; }
+function civKey(M, side) { const p = M.players[side]; return p.civ || p.faction || 'maratha'; }
+function civPal(key) { const i = civInfo(key); return i.palette || LOOK[key] || LOOK.maratha; }
+function palette(side, M) { return civPal(civKey(M, side)); }
+function canon(key) {
+  const s = String(key || '').toLowerCase();
+  if (s.indexOf('rom') === 0) return 'rome'; if (s.indexOf('vik') === 0) return 'vikings'; if (s.indexOf('mara') === 0) return 'marathas';
+  if (s.indexOf('azt') === 0) return 'aztecs'; if (s.indexOf('sam') === 0) return 'samurai'; if (s.indexOf('egy') === 0) return 'egypt';
+  return s === 'mughal' ? 'mughal' : 'other';
+}
+const OLD_ROLE = { foot: 'blade', horse: 'horse', musket: 'bow', scout: 'swarm', cart: 'siege', gun: 'siege', elephant: 'shield', commander: 'hero', epic: 'spell' };
+function roleOf(c) { if (!c) return 'blade'; return c.role || OLD_ROLE[c.body] || (c.kind === 'spell' ? 'spell' : 'blade'); }
+function unitCardId(u) { return RB.CARDS[u.body] ? u.body : (u.card || u.body); }
+function unitRole(u) { return u.role || roleOf(RB.CARDS[unitCardId(u)]); }
+const BEATS = function () { return RB.ROLE_BEATS || { shield: ['blade', 'horse'], blade: ['swarm'], swarm: ['shield'], bow: ['blade', 'shield'], horse: ['bow', 'siege'], siege: [] }; };
+const ROLE_COL = { shield: '#5b7fa6', blade: '#c0503f', swarm: '#8a9a3c', bow: '#3f9a5a', horse: '#a8743c', siege: '#7a7a82', hero: '#f5c04a', spell: '#9a5fd0' };
+const ROLE_NAME = { shield: 'Shield', blade: 'Blade', swarm: 'Swarm', bow: 'Bow', horse: 'Horse', siege: 'Siege', hero: 'Hero', spell: 'Spell' };
+
+// ---------- layout ----------
+function layout(W, H) {
+  const top = Math.round(Math.max(44, H * 0.062)), bottom = Math.round(Math.max(130, Math.min(190, H * 0.2)));
+  let fh = H - top - bottom, fw = W;
+  if (fw / fh > 0.78) fw = Math.round(fh * 0.78);
+  if (fw / fh < 0.5) { fh = Math.round(fw / 0.5); }
+  const fx = Math.round((W - fw) / 2), fy = top + Math.round((H - top - bottom - fh) / 2);
+  return { W: W, H: H, top: top, bottom: bottom, fx: fx, fy: fy, fw: fw, fh: fh, unit: fw / 28 };
+}
+function toScreen(L, x, y) { return { x: L.fx + x * L.fw, y: L.fy + (1 - y) * L.fh }; }
+function toField(L, sx, sy) { return { x: (sx - L.fx) / L.fw, y: 1 - (sy - L.fy) / L.fh }; }
+
+// ---------- arenas: one ground per civ of the player ----------
+const THEMES = {
+  marathas: { base: '#5a4a3a', dark: '#4a3c2f', light: '#6b5a48', tuft: '#8a7a4a', ledge: '#3b3027', water: '#243f52', wl: '#2f5469', bridge: '#9a8b74', bd: '#6f6354', tower: ['#8d8272', '#5e564b', '#b0a48f'], kind: 'basalt' },
+  rome:     { base: '#6e6858', dark: '#59543f', light: '#837c68', tuft: '#7f8a52', ledge: '#4a453a', water: '#2a4a5e', wl: '#3a6078', bridge: '#b3a78e', bd: '#7c725e', tower: ['#b5a78c', '#7a6e58', '#d6c8a8'], kind: 'rome' },
+  vikings:  { base: '#4d6a3a', dark: '#3b552c', light: '#5f7e47', tuft: '#8fae62', ledge: '#33261a', water: '#1d3a52', wl: '#2c5575', bridge: '#8a6a44', bd: '#5a4128', tower: ['#7a5c3a', '#4e3722', '#9c7a50'], kind: 'turf' },
+  aztecs:   { base: '#2b6e6b', dark: '#1f5453', light: '#3a8a84', tuft: '#9ad0a0', ledge: '#5a574a', water: '#17403f', wl: '#2a6460', bridge: '#b9b09a', bd: '#7b7464', tower: ['#a9a28c', '#6b6656', '#cfc7ae'], kind: 'lake' },
+  samurai:  { base: '#a29c8c', dark: '#8c8676', light: '#b9b3a2', tuft: '#6f7f4f', ledge: '#5b564b', water: '#24415a', wl: '#35607f', bridge: '#9c2f2a', bd: '#5e1a18', tower: ['#e4dccb', '#8a8272', '#f7f1e2'], kind: 'gravel' },
+  egypt:    { base: '#cba966', dark: '#b08d4c', light: '#ddc283', tuft: '#8a7a3a', ledge: '#8c6f3a', water: '#2d5f9a', wl: '#4a7fbb', bridge: '#e0c890', bd: '#a88a52', tower: ['#d9bf88', '#a8894f', '#f0dcae'], kind: 'sand' },
+  mughal:   { base: '#58503f', dark: '#483f31', light: '#6a6050', tuft: '#8a7a4a', ledge: '#3b3027', water: '#243f52', wl: '#2f5469', bridge: '#9a8b74', bd: '#6f6354', tower: ['#b0a48f', '#6e6556', '#d4c8ad'], kind: 'basalt' }
+};
+function themeFor(M, view) { return THEMES[canon(civKey(M, view ? view.side : 0))] || THEMES.marathas; }
+
+let groundCache = null, zoneCache = null;
+function drawGround(ctx, L, M, view) {
+  const T = themeFor(M, view), tkey = T.base + L.fw + 'x' + L.fh;
+  if (!groundCache || groundCache.key !== tkey) {
+    const c = document.createElement('canvas'); c.width = L.fw; c.height = L.fh;
+    const g = c.getContext('2d'), u = L.unit, FW = L.fw, FH = L.fh;
+    const rnd = (function () { let a = 7; return function () { a = (a * 16807) % 2147483647; return (a - 1) / 2147483646; }; })();
+    g.fillStyle = T.base; g.fillRect(0, 0, FW, FH);
+    const patches = T.kind === 'sand' ? 140 : 90;
+    for (let i = 0; i < patches; i++) {
+      const x = rnd() * FW, y = rnd() * FH, r = u * (0.6 + rnd() * 2.2);
+      g.fillStyle = rnd() < 0.5 ? T.dark : T.light; g.globalAlpha = 0.3 + rnd() * 0.3;
+      g.beginPath(); g.moveTo(x + r, y);
+      for (let k = 1; k < 7; k++) { const a = k / 7 * 6.283, rr = r * (0.7 + rnd() * 0.5); g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr * 0.6); }
+      g.closePath(); g.fill();
+    }
+    g.globalAlpha = 1;
+    const ry = (1 - RB.FIELD.riverY) * FH, rh = u * 2.2;
+    const bridges = RB.FIELD.bridges;
+    // ---- per-ground dressing (under the moat) ----
+    if (T.kind === 'basalt') {
+      g.strokeStyle = T.tuft; g.lineWidth = 1;
+      for (let i = 0; i < 160; i++) { const x = rnd() * FW, y = rnd() * FH; g.globalAlpha = 0.5; g.beginPath(); g.moveTo(x, y); g.lineTo(x - 2, y - 5); g.moveTo(x, y); g.lineTo(x + 3, y - 6); g.stroke(); }
+      g.globalAlpha = 1;
+      for (const bx of bridges) { g.fillStyle = 'rgba(0,0,0,0.10)'; g.fillRect(bx * FW - u * 1.6, 0, u * 3.2, FH); }
+    } else if (T.kind === 'rome') {
+      // a paved road down each lane, with kerb stones and wheel ruts
+      for (const bx of bridges) {
+        const x0 = bx * FW - u * 2.0, w = u * 4.0;
+        g.fillStyle = '#9b927c'; g.fillRect(x0, 0, w, FH);
+        g.fillStyle = '#847b66'; g.fillRect(x0, 0, u * 0.35, FH); g.fillRect(x0 + w - u * 0.35, 0, u * 0.35, FH);
+        g.strokeStyle = 'rgba(40,34,24,0.35)'; g.lineWidth = 1;
+        for (let y = 0, row = 0; y < FH; y += u * 0.9, row++) { g.beginPath(); g.moveTo(x0, y); g.lineTo(x0 + w, y); g.stroke(); for (let x = x0 + (row % 2) * u * 0.5; x < x0 + w; x += u * 1.0) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + u * 0.9); g.stroke(); } }
+      }
+      // wall along both flanks, with a walkway and merlons
+      for (const side of [0, 1]) {
+        const wx = side === 0 ? 0 : FW - u * 1.5;
+        g.fillStyle = '#a89c82'; g.fillRect(wx, 0, u * 1.5, FH);
+        g.fillStyle = '#c4b89a'; g.fillRect(side === 0 ? wx + u * 0.2 : wx, 0, u * 0.5, FH);
+        g.fillStyle = '#6e6450'; for (let y = 0; y < FH; y += u * 1.4) g.fillRect(side === 0 ? wx + u * 1.1 : wx, y, u * 0.4, u * 0.8);
+      }
+    } else if (T.kind === 'turf') {
+      g.strokeStyle = T.tuft; g.lineWidth = 1.2;
+      for (let i = 0; i < 260; i++) { const x = rnd() * FW, y = rnd() * FH; g.globalAlpha = 0.45; g.beginPath(); g.moveTo(x, y); g.lineTo(x - 2, y - 6); g.moveTo(x, y); g.lineTo(x + 1, y - 7); g.moveTo(x, y); g.lineTo(x + 3, y - 5); g.stroke(); }
+      g.globalAlpha = 1;
+      // muddy tracks and a timber palisade at the flanks
+      for (const bx of bridges) { g.fillStyle = 'rgba(92,70,40,0.5)'; g.fillRect(bx * FW - u * 1.3, 0, u * 2.6, FH); }
+      for (const side of [0, 1]) {
+        const wx = side === 0 ? 0 : FW - u * 0.9;
+        g.fillStyle = '#3d2c1a'; g.fillRect(wx, 0, u * 0.9, FH);
+        for (let y = 0; y < FH; y += u * 0.7) { g.fillStyle = (y / u) % 2 < 1.4 ? '#6a4c2c' : '#56391f'; g.beginPath(); g.moveTo(wx, y + u * 0.7); g.lineTo(wx, y + u * 0.18); g.lineTo(wx + u * 0.45, y); g.lineTo(wx + u * 0.9, y + u * 0.18); g.lineTo(wx + u * 0.9, y + u * 0.7); g.closePath(); g.fill(); }
+      }
+    } else if (T.kind === 'lake') {
+      // the field is lake; stone causeways run along both lanes and the tower platforms
+      g.fillStyle = T.dark; g.fillRect(0, 0, FW, FH);
+      g.strokeStyle = T.wl; g.lineWidth = 1.2;
+      for (let i = 0; i < 90; i++) { const x = rnd() * FW, y = rnd() * FH; g.globalAlpha = 0.5; g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + 6, y - 2, x + 13, y); g.stroke(); }
+      g.globalAlpha = 1;
+      const edge = u * 1.3;
+      for (const lane of [0, 1]) {
+        const x0 = lane === 0 ? edge : FW / 2 + u * 1.0, w = FW / 2 - edge - u * 1.0;
+        g.fillStyle = '#6f6a58'; g.fillRect(x0 - 3, 0, w + 6, FH);
+        g.fillStyle = '#b6ae96'; g.fillRect(x0, 0, w, FH);
+        g.strokeStyle = 'rgba(50,44,32,0.3)'; g.lineWidth = 1;
+        for (let y = 0, row = 0; y < FH; y += u * 1.1, row++) { g.beginPath(); g.moveTo(x0, y); g.lineTo(x0 + w, y); g.stroke(); for (let x = x0 + (row % 2) * u * 0.7; x < x0 + w; x += u * 1.4) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + u * 1.1); g.stroke(); } }
+      }
+      // floating gardens at the edges
+      for (let i = 0; i < 14; i++) { const x = rnd() < 0.5 ? rnd() * edge * 0.8 : FW - rnd() * edge * 0.8, y = rnd() * FH; g.fillStyle = '#4c8c4a'; g.beginPath(); g.ellipse(x, y, u * 0.6, u * 0.28, 0, 0, 6.283); g.fill(); }
+    } else if (T.kind === 'gravel') {
+      // raked gravel, a path of stepping stones down each lane, pines at the flanks
+      g.strokeStyle = 'rgba(70,64,52,0.22)'; g.lineWidth = 1;
+      for (let y = u * 0.8; y < FH; y += u * 0.7) { g.beginPath(); g.moveTo(0, y); for (let x = 0; x <= FW; x += FW / 12) g.lineTo(x, y + Math.sin(x / FW * 14 + y * 0.05) * 2.2); g.stroke(); }
+      for (const bx of bridges) for (let y = u * 0.6; y < FH; y += u * 1.5) { g.fillStyle = '#6d675a'; g.beginPath(); g.ellipse(bx * FW + Math.sin(y) * u * 0.3, y, u * 0.55, u * 0.3, 0, 0, 6.283); g.fill(); g.fillStyle = '#8b8575'; g.beginPath(); g.ellipse(bx * FW + Math.sin(y) * u * 0.3, y - 1, u * 0.48, u * 0.24, 0, 0, 6.283); g.fill(); }
+      for (const side of [0, 1]) for (let y = u * 1.5; y < FH; y += u * 3.6 + rnd() * u) {
+        const x = side === 0 ? u * 0.55 : FW - u * 0.55;
+        g.fillStyle = 'rgba(0,0,0,0.22)'; g.beginPath(); g.ellipse(x + u * 0.3, y + u * 0.2, u * 0.8, u * 0.3, 0, 0, 6.283); g.fill();
+        g.fillStyle = '#4a3a2a'; g.fillRect(x - u * 0.08, y - u * 0.6, u * 0.16, u * 0.7);
+        for (let k = 0; k < 3; k++) { g.fillStyle = k % 2 ? '#2f4f33' : '#3a6040'; g.beginPath(); g.moveTo(x - u * (0.75 - k * 0.14), y - u * (0.4 + k * 0.55)); g.lineTo(x, y - u * (1.45 + k * 0.55)); g.lineTo(x + u * (0.75 - k * 0.14), y - u * (0.4 + k * 0.55)); g.closePath(); g.fill(); }
+      }
+    } else if (T.kind === 'sand') {
+      g.strokeStyle = 'rgba(120,88,40,0.28)'; g.lineWidth = 1.2;
+      for (let y = u * 0.6; y < FH; y += u * 0.9) { g.beginPath(); g.moveTo(0, y); for (let x = 0; x <= FW; x += FW / 10) g.lineTo(x, y + Math.sin(x / FW * 9 + y * 0.07) * 3); g.stroke(); }
+      for (let i = 0; i < 22; i++) { const x = rnd() * FW, y = rnd() * FH, w = u * (0.6 + rnd() * 0.8); g.fillStyle = '#e4cc98'; g.fillRect(x, y, w, w * 0.55); g.fillStyle = '#b5935a'; g.fillRect(x, y + w * 0.55, w, w * 0.2); }
+      for (const bx of bridges) { g.fillStyle = 'rgba(255,240,200,0.14)'; g.fillRect(bx * FW - u * 1.8, 0, u * 3.6, FH); }
+      // a palm or two at the flanks
+      for (const side of [0, 1]) for (let y = u * 2; y < FH; y += u * 6.5) {
+        const x = side === 0 ? u * 0.8 : FW - u * 0.8;
+        g.strokeStyle = '#7a5a2a'; g.lineWidth = u * 0.18; g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + (side ? -1 : 1) * u * 0.3, y - u * 1.2, x, y - u * 2.0); g.stroke();
+        g.strokeStyle = '#4e7a34'; g.lineWidth = u * 0.16; for (let k = -2; k <= 2; k++) { g.beginPath(); g.moveTo(x, y - u * 2.0); g.quadraticCurveTo(x + k * u * 0.5, y - u * 2.5, x + k * u * 0.8, y - u * 1.7); g.stroke(); }
+      }
+    }
+    // ---- the moat ----
+    g.fillStyle = T.ledge; g.fillRect(0, ry - rh / 2 - 3, FW, rh + 6);
+    g.fillStyle = T.water; g.fillRect(0, ry - rh / 2, FW, rh);
+    g.strokeStyle = T.wl; g.lineWidth = 1.5;
+    for (let i = 0; i < 26; i++) { const x = rnd() * FW, y = ry - rh / 2 + 4 + rnd() * (rh - 8); g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + 6, y - 2, x + 12, y); g.stroke(); }
+    // ---- bridges ----
+    for (const bx of bridges) {
+      const bw = RB.FIELD.bridgeHalf * 2 * FW, x0 = bx * FW - bw / 2;
+      g.fillStyle = T.bd; g.fillRect(x0 - 2, ry - rh / 2 - 6, bw + 4, rh + 12);
+      g.fillStyle = T.bridge; g.fillRect(x0, ry - rh / 2 - 4, bw, rh + 8);
+      g.strokeStyle = T.bd; g.lineWidth = 1;
+      if (T.kind === 'turf' || T.kind === 'gravel') {
+        for (let k = 1; k < 6; k++) { g.beginPath(); g.moveTo(x0, ry - rh / 2 - 4 + k * (rh + 8) / 6); g.lineTo(x0 + bw, ry - rh / 2 - 4 + k * (rh + 8) / 6); g.stroke(); }
+        g.fillStyle = T.bd; g.fillRect(x0 - 2, ry - rh / 2 - 6, 3, rh + 12); g.fillRect(x0 + bw - 1, ry - rh / 2 - 6, 3, rh + 12);
+      } else {
+        for (let k = 1; k < 5; k++) { g.beginPath(); g.moveTo(x0 + k * bw / 5, ry - rh / 2 - 4); g.lineTo(x0 + k * bw / 5, ry + rh / 2 + 4); g.stroke(); }
+        for (let k = 0; k < 4; k++) { g.beginPath(); g.moveTo(x0, ry - rh / 2 - 4 + k * (rh + 8) / 3); g.lineTo(x0 + bw, ry - rh / 2 - 4 + k * (rh + 8) / 3); g.stroke(); }
+      }
+    }
+    // ramparts along each tower line
+    for (const y of [0.12, 0.88]) { const yy = (1 - y) * FH; g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(0, yy - 2, FW, 4); }
+    // vignette
+    const v = g.createRadialGradient(FW / 2, FH / 2, FH * 0.3, FW / 2, FH / 2, FH * 0.75);
+    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.38)');
+    g.fillStyle = v; g.fillRect(0, 0, FW, FH);
+    groundCache = { c: c, key: tkey };
+  }
+  ctx.drawImage(groundCache.c, L.fx, L.fy);
+  // deploy zone while holding a card
+  const held = view && view.holding ? RB.CARDS[view.holding] : null;
+  if (held) {
+    const side = view.side;
+    ctx.save(); ctx.beginPath(); ctx.rect(L.fx, L.fy, L.fw, L.fh); ctx.clip();
+    if (roleOf(held) === 'spell') {
+      const lane = view.hover ? (view.hover.x < 0.5 ? 0 : 1) : -1;
+      if (lane >= 0) { ctx.fillStyle = 'rgba(180,120,240,0.18)'; ctx.fillRect(L.fx + lane * L.fw / 2, L.fy, L.fw / 2, L.fh); ctx.strokeStyle = 'rgba(200,160,255,0.6)'; ctx.lineWidth = 2; ctx.strokeRect(L.fx + lane * L.fw / 2 + 1, L.fy + 1, L.fw / 2 - 2, L.fh - 2); }
+    } else {
+      // the legal ground changes only when a tower falls, so it is drawn once per (side, towers alive) into a layer
+      const zk = side + '|' + M.towers.map(function (q) { return q.alive ? 1 : 0; }).join('') + '|' + L.fw + 'x' + L.fh;
+      if (!zoneCache || zoneCache.key !== zk) {
+        const zc = document.createElement('canvas'); zc.width = L.fw; zc.height = L.fh; const zg = zc.getContext('2d');
+        zg.fillStyle = 'rgba(240,178,58,0.10)'; const step = L.fw / 24;
+        for (let x = 0; x < L.fw; x += step) for (let y = 0; y < L.fh; y += step) {
+          const f = toField(L, L.fx + x + step / 2, L.fy + y + step / 2);
+          if (RB.canDeploy(M, side, f.x, f.y)) zg.fillRect(x, y, step + 0.5, step + 0.5);
+        }
+        zoneCache = { c: zc, key: zk };
+      }
+      ctx.drawImage(zoneCache.c, L.fx, L.fy);
+      if (view.hover) {
+        const ok = RB.canDeploy(M, side, view.hover.x, view.hover.y), p = toScreen(L, view.hover.x, view.hover.y);
+        ctx.strokeStyle = ok ? LOOK.energy : LOOK.red; ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
+        ctx.beginPath(); ctx.ellipse(p.x, p.y, L.unit * 1.4, L.unit * 0.8, 0, 0, 6.283); ctx.stroke(); ctx.setLineDash([]);
+      }
+    }
+    ctx.restore();
+  }
+}
+// ---------- towers ----------
+function drawTower(ctx, L, M, t, now) {
+  const TW = (THEMES[canon(civKey(M, 0))] || THEMES.marathas).tower;
+  const p = toScreen(L, t.x, t.y), u = L.unit, king = t.kind === 'king';
+  const r = king ? u * 2.0 : u * 1.45, h = king ? u * 2.6 : u * 1.9;
+  const pal = palette(t.side, M);
+  if (!t.alive) {
+    ctx.fillStyle = LOOK.rubble;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y + u * 0.2, r * 1.2, r * 0.6, 0, 0, 6.283); ctx.fill();
+    ctx.fillStyle = TW[1];
+    for (let i = 0; i < 6; i++) { const a = i * 1.05, rr = r * 0.7; ctx.fillRect(p.x + Math.cos(a) * rr - 4, p.y + Math.sin(a) * rr * 0.5 - 3, 8, 6); }
+    return;
+  }
+  // shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(p.x + u * 0.3, p.y + u * 0.35, r * 1.15, r * 0.55, 0, 0, 6.283); ctx.fill();
+  // drum
+  ctx.fillStyle = TW[1]; ctx.beginPath(); ctx.ellipse(p.x, p.y, r, r * 0.5, 0, 0, 6.283); ctx.fill();
+  ctx.fillStyle = TW[0]; ctx.fillRect(p.x - r, p.y - h, r * 2, h);
+  ctx.fillStyle = TW[1]; ctx.fillRect(p.x + r * 0.45, p.y - h, r * 0.55, h);
+  ctx.fillStyle = TW[2]; ctx.fillRect(p.x - r, p.y - h, r * 0.35, h);
+  // course lines
+  ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1;
+  for (let k = 1; k < 5; k++) { ctx.beginPath(); ctx.moveTo(p.x - r, p.y - h + k * h / 5); ctx.lineTo(p.x + r, p.y - h + k * h / 5); ctx.stroke(); }
+  // top and merlons
+  ctx.fillStyle = TW[2]; ctx.beginPath(); ctx.ellipse(p.x, p.y - h, r, r * 0.5, 0, 0, 6.283); ctx.fill();
+  ctx.fillStyle = TW[0];
+  const n = king ? 7 : 5;
+  for (let k = 0; k < n; k++) { const x = p.x - r + (k + 0.5) * (2 * r / n); ctx.fillRect(x - r / n * 0.3, p.y - h - u * 0.5, r / n * 0.6, u * 0.5); }
+  // gate on the king tower
+  if (king) {
+    ctx.fillStyle = LOOK.ink; ctx.beginPath(); ctx.moveTo(p.x - u * 0.6, p.y + r * 0.1); ctx.lineTo(p.x - u * 0.6, p.y - u * 0.8); ctx.arc(p.x, p.y - u * 0.8, u * 0.6, Math.PI, 0); ctx.lineTo(p.x + u * 0.6, p.y + r * 0.1); ctx.closePath(); ctx.fill();
+  }
+  // standard
+  const fx = p.x + r * 0.2, fy = p.y - h - u * 0.5;
+  ctx.strokeStyle = LOOK.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(fx, fy - u * 1.6); ctx.stroke();
+  const wave = Math.sin(now * 4 + t.x * 10) * u * 0.12;
+  ctx.fillStyle = pal.flag; ctx.beginPath(); ctx.moveTo(fx, fy - u * 1.6); ctx.lineTo(fx + u * 1.1, fy - u * 1.35 + wave); ctx.lineTo(fx, fy - u * 1.05); ctx.closePath(); ctx.fill();
+  // sleeping king: no banner glow; awake: a brazier
+  if (king && t.awake) { ctx.fillStyle = '#ffb347'; ctx.beginPath(); ctx.arc(p.x - r * 0.5, p.y - h - u * 0.3 + Math.sin(now * 9) * 1, u * 0.22, 0, 6.283); ctx.fill(); }
+  // damage cracks
+  const f = t.hp / t.maxHp;
+  if (f < 0.66) { ctx.strokeStyle = LOOK.ink; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(p.x - r * 0.3, p.y - h * 0.9); ctx.lineTo(p.x - r * 0.1, p.y - h * 0.6); ctx.lineTo(p.x - r * 0.35, p.y - h * 0.35); ctx.stroke(); }
+  if (f < 0.33) { ctx.beginPath(); ctx.moveTo(p.x + r * 0.5, p.y - h * 0.8); ctx.lineTo(p.x + r * 0.2, p.y - h * 0.5); ctx.lineTo(p.x + r * 0.45, p.y - h * 0.15); ctx.stroke(); }
+  // health
+  drawBar(ctx, p.x, p.y - h - u * 1.0 - (king ? u * 1.2 : u * 1.0), r * 2, u * 0.32, f, t.side === 0 ? LOOK.energy : LOOK.red);
+}
+function drawBar(ctx, cx, y, w, h, f, color) {
+  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(cx - w / 2 - 1, y - 1, w + 2, h + 2);
+  ctx.fillStyle = color; ctx.fillRect(cx - w / 2, y, w * Math.max(0, f), h);
+}
+
+// ---------- units ----------
+function hurtOf(u, M, fx, now) {
+  let h = 0;
+  for (const f of fx) {
+    if (f.kind !== 'hit' || f.tower) continue;
+    const k = (now - f.t0) / 0.22; if (k < 0 || k >= 1) continue;
+    if (Math.abs(f.x - u.x) < 0.045 && Math.abs(f.y - u.y) < 0.045) h = Math.max(h, 1 - k);
+  }
+  return h;
+}
+function oldHeight(b) { return b === 'elephant' ? 2.6 : (b === 'horse' ? 1.9 : (b === 'commander' ? 2.0 : (b === 'cart' || b === 'gun' ? 1.5 : 1.5))); }
+function figHeight(cid, card) {
+  if (RB.figureHeight) { const h = RB.figureHeight(cid); if (h > 0) return h; }
+  return oldHeight(card && card.body);
+}
+// Figures are flat-shaded paths and cost real time at 30 units; each (card, side, facing, walk frame, size) is drawn once into a sprite.
+const SPRITES = {};
+let spriteCount = 0;
+function drawSprite(ctx, cid, side, s, ph, hero, face, hq, buff) {
+  hq = hq || 0; buff = !!buff;
+  const TAU = 6.2832, NB = 10, b = Math.floor((((ph % TAU) + TAU) % TAU) / TAU * NB);
+  const tr = ctx.getTransform ? ctx.getTransform() : null, k = tr ? Math.max(1, Math.round(Math.hypot(tr.a, tr.b) * 2) / 2) : 1;
+  const key = cid + '|' + side + '|' + face + '|' + b + '|' + hero + '|' + hq + buff + '|' + Math.round(s * 4) + '|' + k;
+  let sp = SPRITES[key];
+  if (!sp) {
+    if (spriteCount > 600) { for (const q in SPRITES) delete SPRITES[q]; spriteCount = 0; }
+    const fw = RB.figureWidth ? RB.figureWidth(cid) : 2.4, fh = figHeight(cid, RB.CARDS[cid]);
+    const hw = fw * 0.5 * 1.45 * s + s * 0.7, up = fh * s * 1.3 + s * 0.8, dn = s * 0.5;
+    const c = document.createElement('canvas'); c.width = Math.ceil(hw * 2 * k); c.height = Math.ceil((up + dn) * k);
+    const g = c.getContext('2d'); g.scale(k, k); g.translate(hw, up);
+    RB.drawFigure(g, cid, side, s, (b + 0.5) / NB * TAU, { hurt: hq / 3, hero: hero, buff: buff, facing: face });
+    sp = SPRITES[key] = { c: c, hw: hw, up: up, w: c.width / k, h: c.height / k }; spriteCount++;
+  }
+  ctx.drawImage(sp.c, -sp.hw, -sp.up, sp.w, sp.h);
+}
+function drawUnit(ctx, L, M, u, now, fx) {
+  const p = toScreen(L, u.x, u.y), s = L.unit * 1.2, pal = palette(u.side, M);
+  const cid = unitCardId(u), card = RB.CARDS[cid], role = unitRole(u);
+  const ph = now * 9 + u.bob, bob = Math.sin(ph) * s * 0.08, dead = !u.alive;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  if (dead) { const k = Math.min(1, (M.t - (u.died || M.t)) / 1.0); ctx.globalAlpha = 1 - k; ctx.rotate(u.facing > 0 ? 1.3 : -1.3); }
+  ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.beginPath(); ctx.ellipse(0, s * 0.15, s * 0.55, s * 0.22, 0, 0, 6.283); ctx.fill();
+  let drawn = false;
+  if (RB.drawFigure) {
+    try {
+      const hurt = dead ? 0 : hurtOf(u, M, fx, now), face = u.facing >= 0 ? 1 : -1, hero = role === 'hero';
+      drawSprite(ctx, cid, u.side, s, ph, hero, face, hurt > 0 ? Math.ceil(hurt * 3) : 0, u.buff > 0);
+      drawn = true;
+    } catch (e) { drawn = false; }
+  }
+  if (!drawn) {
+    const b = card ? card.body : u.body;
+    if (b === 'elephant') drawElephant(ctx, s, pal, ph);
+    else if (b === 'horse') drawHorse(ctx, s, pal, ph, u.side);
+    else if (b === 'cart') drawCart(ctx, s, pal, ph);
+    else if (b === 'gun') drawGun(ctx, s, pal, ph, u.side);
+    else drawMan(ctx, s, pal, ph, b, u.side, bob);
+    const hh = dead ? 0 : hurtOf(u, M, fx, now);
+    if (hh > 0) { ctx.globalAlpha = hh * 0.5; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(0, -s * 0.8, s * 0.5, s * 0.9, 0, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1; }
+  }
+  if (u.buff > 0) { ctx.strokeStyle = LOOK.epic; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.ellipse(0, s * 0.15, s * 0.8, s * 0.32, 0, 0, 6.283); ctx.stroke(); ctx.globalAlpha = 1; }
+  ctx.restore();
+  if (!dead && u.hp < u.maxHp) drawBar(ctx, p.x, p.y - figHeight(cid, card) * s - s * 0.35, s * 1.2, s * 0.16, u.hp / u.maxHp, u.side === 0 ? LOOK.energy : LOOK.red);
+}
+
+// ---------- counter hints while holding a card ----------
+function drawHints(ctx, L, M, view, now) {
+  const held = view.holding ? RB.CARDS[view.holding] : null; if (!held) return;
+  const mine = roleOf(held); if (mine === 'spell' || mine === 'hero') return;
+  const B = BEATS(), s = L.unit, pulse = 0.65 + 0.35 * Math.sin(now * 6);
+  for (const u of M.units) {
+    if (!u.alive || u.side === view.side) continue;
+    const r = unitRole(u), beats = (B[mine] || []).indexOf(r) >= 0, beaten = (B[r] || []).indexOf(mine) >= 0;
+    if (!beats && !beaten) continue;
+    const p = toScreen(L, u.x, u.y);
+    ctx.save(); ctx.lineWidth = 2.5; ctx.globalAlpha = pulse;
+    ctx.strokeStyle = beats ? LOOK.good : LOOK.bad; if (!beats) ctx.setLineDash([5, 3]);
+    ctx.beginPath(); ctx.ellipse(p.x, p.y + s * 0.15, s * 1.15, s * 0.5, 0, 0, 6.283); ctx.stroke();
+    ctx.globalAlpha = pulse * 0.2; ctx.fillStyle = beats ? LOOK.good : LOOK.bad; ctx.fill();
+    ctx.restore();
+  }
+}
+function drawHintLegend(ctx, L, M, view) {
+  const held = view.holding ? RB.CARDS[view.holding] : null; if (!held) return;
+  const mine = roleOf(held); if (mine === 'spell' || mine === 'hero') return;
+  const B = BEATS(), u = L.unit, beats = B[mine] || [], falls = [];
+  for (const r in B) if ((B[r] || []).indexOf(mine) >= 0) falls.push(r);
+  const ic = u * 1.15, h = u * 1.9, y = L.fy + L.fh - h - u * 0.5;
+  const parts = [{ t: 'beats', col: LOOK.good, roles: beats }, { t: 'falls to', col: LOOK.bad, roles: falls }];
+  ctx.font = 'bold ' + Math.round(u * 0.62) + 'px system-ui, sans-serif';
+  let w = u * 3.2 + ic;
+  for (const p of parts) w += ctx.measureText(p.t).width + u * 0.8 + Math.max(1, p.roles.length) * (ic + u * 0.25) + u * 0.7;
+  const x0 = L.fx + (L.fw - w) / 2;
+  ctx.fillStyle = 'rgba(12,9,6,0.82)'; roundRect(ctx, x0, y, w, h, h / 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(241,230,207,0.25)'; ctx.lineWidth = 1; roundRect(ctx, x0, y, w, h, h / 2); ctx.stroke();
+  let x = x0 + u * 0.9;
+  roleBadge(ctx, mine, x + ic / 2, y + h / 2, ic); x += ic + u * 0.5;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  for (const p of parts) {
+    ctx.fillStyle = p.col; ctx.fillText(p.t, x, y + h / 2 + 1); x += ctx.measureText(p.t).width + u * 0.5;
+    if (!p.roles.length) { ctx.fillStyle = '#8a7f70'; ctx.fillText('none', x, y + h / 2 + 1); x += ctx.measureText('none').width + u * 0.7; continue; }
+    for (const r of p.roles) { ctx.strokeStyle = p.col; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x + ic / 2, y + h / 2, ic / 2 + 1.5, 0, 6.283); ctx.stroke(); roleBadge(ctx, r, x + ic / 2, y + h / 2, ic); x += ic + u * 0.25; }
+    x += u * 0.7;
+  }
+}
+
+// ---------- role icons ----------
+function roleBadge(ctx, role, cx, cy, d) {
+  ctx.save(); ctx.translate(cx, cy);
+  ctx.fillStyle = '#17120d'; ctx.beginPath(); ctx.arc(0, 0, d / 2, 0, 6.283); ctx.fill();
+  ctx.fillStyle = '#f6ead0'; ctx.strokeStyle = '#f6ead0';
+  if (RB.drawRoleIcon) { try { RB.drawRoleIcon(ctx, role, d * 0.86); } catch (e) { fallbackIcon(ctx, role, d * 0.86); } }
+  else fallbackIcon(ctx, role, d * 0.86);
+  ctx.restore();
+}
+function fallbackIcon(ctx, role, d) {
+  const r = d / 2, col = ROLE_COL[role] || '#ccc';
+  ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = Math.max(1.2, d * 0.1); ctx.lineCap = 'round';
+  if (role === 'shield') { ctx.beginPath(); ctx.moveTo(-r * 0.6, -r * 0.6); ctx.lineTo(r * 0.6, -r * 0.6); ctx.lineTo(r * 0.5, r * 0.2); ctx.lineTo(0, r * 0.75); ctx.lineTo(-r * 0.5, r * 0.2); ctx.closePath(); ctx.fill(); }
+  else if (role === 'blade') { ctx.beginPath(); ctx.moveTo(-r * 0.55, r * 0.55); ctx.lineTo(r * 0.5, -r * 0.5); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-r * 0.5, r * 0.05); ctx.lineTo(-r * 0.05, r * 0.5); ctx.stroke(); }
+  else if (role === 'swarm') { for (const q of [[-0.45, 0.3], [0.45, 0.3], [0, -0.45]]) { ctx.beginPath(); ctx.arc(q[0] * r, q[1] * r, r * 0.26, 0, 6.283); ctx.fill(); } }
+  else if (role === 'bow') { ctx.beginPath(); ctx.arc(-r * 0.2, 0, r * 0.7, -1.2, 1.2); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-r * 0.2 + Math.cos(1.2) * r * 0.7, Math.sin(1.2) * r * 0.7); ctx.lineTo(-r * 0.2 + Math.cos(1.2) * r * 0.7, -Math.sin(1.2) * r * 0.7); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-r * 0.6, 0); ctx.lineTo(r * 0.7, 0); ctx.stroke(); }
+  else if (role === 'horse') { ctx.beginPath(); ctx.moveTo(-r * 0.6, r * 0.6); ctx.lineTo(-r * 0.2, -r * 0.2); ctx.lineTo(r * 0.2, -r * 0.7); ctx.lineTo(r * 0.65, -r * 0.45); ctx.lineTo(r * 0.2, -r * 0.1); ctx.lineTo(r * 0.3, r * 0.6); ctx.stroke(); }
+  else if (role === 'siege') { ctx.beginPath(); ctx.arc(-r * 0.2, r * 0.35, r * 0.3, 0, 6.283); ctx.fill(); ctx.beginPath(); ctx.moveTo(-r * 0.2, r * 0.35); ctx.lineTo(r * 0.55, -r * 0.6); ctx.stroke(); }
+  else if (role === 'hero') { ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = -1.5708 + i * 0.6283, rr = i % 2 ? r * 0.35 : r * 0.8; ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } ctx.closePath(); ctx.fill(); }
+  else { ctx.beginPath(); ctx.moveTo(r * 0.1, -r * 0.8); ctx.lineTo(-r * 0.45, r * 0.1); ctx.lineTo(0, r * 0.1); ctx.lineTo(-r * 0.1, r * 0.8); ctx.lineTo(r * 0.5, -r * 0.15); ctx.lineTo(0, -r * 0.15); ctx.closePath(); ctx.fill(); }
+}
+
+// ---------- civ crests (drawn in code, nothing religious) ----------
+const CRESTS = {};
+function drawCrest(ctx, key, cx, cy, r, sel) {
+  const tr = ctx.getTransform ? ctx.getTransform() : null, k = tr ? Math.max(1, Math.round(Math.hypot(tr.a, tr.b) * 2) / 2) : 1;
+  const ck = key + '|' + Math.round(r * 2) + '|' + sel + '|' + k; let c = CRESTS[ck];
+  const half = r * 1.7;
+  if (!c) { c = document.createElement('canvas'); c.width = Math.ceil(half * 2 * k); c.height = c.width; const g = c.getContext('2d'); g.scale(k, k); drawCrestRaw(g, key, half, half, r, sel); CRESTS[ck] = c; }
+  ctx.drawImage(c, cx - half, cy - half, c.width / k, c.height / k);
+}
+function drawCrestRaw(ctx, key, cx, cy, r, sel) {
+  const pal = civPal(key), kind = canon(key);
+  ctx.save(); ctx.translate(cx, cy);
+  if (sel) { const hg = ctx.createRadialGradient(0, 0, r * 0.8, 0, 0, r * 1.6); hg.addColorStop(0, pal.body + '88'); hg.addColorStop(1, pal.body + '00'); ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(0, 0, r * 1.6, 0, 6.283); ctx.fill(); }
+  ctx.fillStyle = '#17120d'; ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.283); ctx.fill();
+  ctx.strokeStyle = pal.body; ctx.lineWidth = Math.max(1.5, r * (sel ? 0.1 : 0.06)); ctx.beginPath(); ctx.arc(0, 0, r - 1, 0, 6.283); ctx.stroke();
+  ctx.fillStyle = pal.body; ctx.strokeStyle = pal.body; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const R = r * 0.72;
+  if (kind === 'rome') {
+    // laurel wreath around a standard
+    ctx.fillStyle = pal.metal;
+    for (const sd of [-1, 1]) for (let i = 0; i < 6; i++) { const a = 1.9 + i * 0.28; ctx.save(); ctx.rotate(sd * (a - 1.57) * 0.0); const ang = Math.PI / 2 + sd * (0.35 + i * 0.36); const px = Math.cos(ang) * R * 0.95, py = Math.sin(ang) * R * 0.95; ctx.translate(px, py); ctx.rotate(ang + sd * 1.2); ctx.beginPath(); ctx.ellipse(0, 0, R * 0.24, R * 0.1, 0, 0, 6.283); ctx.fill(); ctx.restore(); }
+    ctx.fillStyle = pal.body; ctx.lineWidth = R * 0.12;
+    ctx.beginPath(); ctx.moveTo(0, R * 0.65); ctx.lineTo(0, -R * 0.55); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-R * 0.4, -R * 0.2); ctx.lineTo(R * 0.4, -R * 0.2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, -R * 0.55, R * 0.16, 0, 6.283); ctx.fill();
+  } else if (kind === 'vikings') {
+    // raven in profile: heavy beak, long tail, one folded wing
+    ctx.fillStyle = '#e9edf2';
+    ctx.beginPath(); ctx.ellipse(-R * 0.1, R * 0.12, R * 0.58, R * 0.34, -0.45, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.arc(R * 0.4, -R * 0.4, R * 0.24, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(R * 0.58, -R * 0.52); ctx.lineTo(R * 1.02, -R * 0.34); ctx.lineTo(R * 0.6, -R * 0.26); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-R * 0.4, R * 0.28); ctx.lineTo(-R * 1.0, R * 0.78); ctx.lineTo(-R * 0.82, R * 0.46); ctx.lineTo(-R * 0.26, R * 0.5); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#e9edf2'; ctx.lineWidth = R * 0.07; ctx.beginPath(); ctx.moveTo(R * 0.0, R * 0.42); ctx.lineTo(R * 0.0, R * 0.82); ctx.moveTo(R * 0.18, R * 0.38); ctx.lineTo(R * 0.22, R * 0.8); ctx.stroke();
+    ctx.strokeStyle = '#17120d'; ctx.lineWidth = R * 0.06; ctx.beginPath(); ctx.moveTo(-R * 0.55, R * 0.08); ctx.quadraticCurveTo(-R * 0.1, -R * 0.2, R * 0.3, R * 0.05); ctx.stroke();
+    ctx.fillStyle = pal.body; ctx.beginPath(); ctx.arc(R * 0.46, -R * 0.44, R * 0.06, 0, 6.283); ctx.fill();
+  } else if (kind === 'marathas') {
+    // sun with rays and a sword upright
+    ctx.lineWidth = R * 0.09;
+    for (let i = 0; i < 12; i++) { const a = i * 0.5236; ctx.beginPath(); ctx.moveTo(Math.cos(a) * R * 0.62, Math.sin(a) * R * 0.62); ctx.lineTo(Math.cos(a) * R * 0.95, Math.sin(a) * R * 0.95); ctx.stroke(); }
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.5, 0, 6.283); ctx.fill();
+    ctx.fillStyle = '#17120d'; ctx.beginPath(); ctx.moveTo(0, -R * 0.45); ctx.lineTo(R * 0.09, R * 0.25); ctx.lineTo(-R * 0.09, R * 0.25); ctx.closePath(); ctx.fill();
+    ctx.fillRect(-R * 0.26, R * 0.22, R * 0.52, R * 0.08); ctx.fillRect(-R * 0.04, R * 0.28, R * 0.08, R * 0.2);
+  } else if (kind === 'aztecs') {
+    // eagle, wings raised, head in profile
+    ctx.fillStyle = pal.body;
+    ctx.beginPath(); ctx.moveTo(0, R * 0.8); ctx.lineTo(-R * 0.22, R * 0.2); ctx.lineTo(-R * 0.95, -R * 0.65); ctx.lineTo(-R * 0.6, -R * 0.15); ctx.lineTo(-R * 0.75, R * 0.05); ctx.lineTo(-R * 0.3, R * 0.1); ctx.lineTo(0, R * 0.8);
+    ctx.moveTo(0, R * 0.8); ctx.lineTo(R * 0.22, R * 0.2); ctx.lineTo(R * 0.95, -R * 0.65); ctx.lineTo(R * 0.6, -R * 0.15); ctx.lineTo(R * 0.75, R * 0.05); ctx.lineTo(R * 0.3, R * 0.1); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = pal.metal; ctx.beginPath(); ctx.arc(0, -R * 0.15, R * 0.24, 0, 6.283); ctx.fill();
+    ctx.fillStyle = pal.flag; ctx.beginPath(); ctx.moveTo(R * 0.05, -R * 0.12); ctx.lineTo(R * 0.4, R * 0.0); ctx.lineTo(R * 0.05, R * 0.08); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#17120d'; ctx.beginPath(); ctx.arc(R * 0.06, -R * 0.2, R * 0.05, 0, 6.283); ctx.fill();
+  } else if (kind === 'samurai') {
+    // mon: ring with five blossoms
+    ctx.lineWidth = R * 0.12; ctx.strokeStyle = '#f2f2f2'; ctx.beginPath(); ctx.arc(0, 0, R * 0.9, 0, 6.283); ctx.stroke();
+    ctx.fillStyle = '#f2f2f2';
+    for (let i = 0; i < 5; i++) { const a = -1.5708 + i * 1.2566; ctx.beginPath(); ctx.arc(Math.cos(a) * R * 0.42, Math.sin(a) * R * 0.42, R * 0.28, 0, 6.283); ctx.fill(); }
+    ctx.fillStyle = pal.body; ctx.beginPath(); ctx.arc(0, 0, R * 0.17, 0, 6.283); ctx.fill();
+  } else if (kind === 'egypt') {
+    // sun disc with rays over a lapis band
+    ctx.lineWidth = R * 0.1;
+    for (let i = 0; i < 9; i++) { const a = Math.PI + (i - 4) * 0.34 - Math.PI / 2 + Math.PI; ctx.beginPath(); ctx.moveTo(Math.cos(a) * R * 0.55, Math.sin(a) * R * 0.55 - R * 0.1); ctx.lineTo(Math.cos(a) * R * 0.95, Math.sin(a) * R * 0.95 - R * 0.1); ctx.stroke(); }
+    ctx.beginPath(); ctx.arc(0, -R * 0.1, R * 0.42, 0, 6.283); ctx.fill();
+    ctx.fillStyle = pal.metal; ctx.fillRect(-R * 0.8, R * 0.38, R * 1.6, R * 0.2); ctx.fillStyle = pal.body; ctx.fillRect(-R * 0.8, R * 0.62, R * 1.6, R * 0.1);
+  } else {
+    ctx.beginPath(); ctx.moveTo(0, -R * 0.85); ctx.quadraticCurveTo(R * 0.9, -R * 0.4, R * 0.7, R * 0.4); ctx.lineTo(0, R * 0.85); ctx.lineTo(-R * 0.7, R * 0.4); ctx.quadraticCurveTo(-R * 0.9, -R * 0.4, 0, -R * 0.85); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = pal.cloth; ctx.beginPath(); ctx.arc(0, -R * 0.05, R * 0.25, 0, 6.283); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// A card's figure in miniature for the hand. s is the unit scale, so size to fit a box of boxH px.
+function drawCardFigure(ctx, card, s, M, side, boxH) {
+  const key = card.civ || card.faction;
+  const cid = card.id;
+  if (RB.drawFigure) {
+    let k = s;
+    if (boxH) { const h = figHeight(cid, card); k = Math.min(s, boxH / Math.max(1.2, h)); }
+    try { drawSprite(ctx, cid, 0, k, 0, roleOf(card) === 'hero', 1); return; } catch (e) { /* fall through */ }
+  }
+  const pal = card.faction === 'epic' ? { body: LOOK.epic, dark: '#a06a10', cloth: '#fff2cc', metal: '#f5e4a0', flag: LOOK.epic } : civPal(key);
+  if (card.body === 'epic' || roleOf(card) === 'spell') { drawHanumanFigure(ctx, s, 0); return; }
+  if (card.body === 'elephant') drawElephant(ctx, s * 0.6, pal, 0);
+  else if (card.body === 'horse') drawHorse(ctx, s * 0.75, pal, 0, 0);
+  else if (card.body === 'cart') drawCart(ctx, s * 0.8, pal, 0);
+  else if (card.body === 'gun') drawGun(ctx, s * 0.75, pal, 0, 0);
+  else drawMan(ctx, s, pal, 0, card.body, 0, 0);
+}
+
+// ---------- legacy figures (fallback when RB.drawFigure is absent) ----------
+function drawMan(ctx, s, pal, ph, body, side, bob) {
+  const scout = body === 'scout', cmd = body === 'commander', musket = body === 'musket';
+  const k = scout ? 0.8 : (cmd ? 1.25 : 1);
+  const leg = Math.sin(ph) * s * 0.25 * k;
+  ctx.lineCap = 'round';
+  // legs
+  ctx.strokeStyle = pal.dark; ctx.lineWidth = s * 0.16 * k;
+  ctx.beginPath(); ctx.moveTo(-s * 0.12 * k, -s * 0.35 * k); ctx.lineTo(-s * 0.14 * k + leg, s * 0.12); ctx.moveTo(s * 0.12 * k, -s * 0.35 * k); ctx.lineTo(s * 0.14 * k - leg, s * 0.12); ctx.stroke();
+  // body (angarkha)
+  ctx.fillStyle = pal.body;
+  ctx.beginPath(); ctx.moveTo(-s * 0.3 * k, -s * 0.95 * k + bob); ctx.lineTo(s * 0.3 * k, -s * 0.95 * k + bob); ctx.lineTo(s * 0.36 * k, -s * 0.3 * k + bob); ctx.lineTo(-s * 0.36 * k, -s * 0.3 * k + bob); ctx.closePath(); ctx.fill();
+  // sash
+  ctx.fillStyle = pal.cloth; ctx.fillRect(-s * 0.36 * k, -s * 0.5 * k + bob, s * 0.72 * k, s * 0.1 * k);
+  // head and turban
+  ctx.fillStyle = '#c98a5a'; ctx.beginPath(); ctx.arc(0, -s * 1.15 * k + bob, s * 0.2 * k, 0, 6.283); ctx.fill();
+  ctx.fillStyle = pal.cloth; ctx.beginPath(); ctx.ellipse(0, -s * 1.28 * k + bob, s * 0.26 * k, s * 0.14 * k, 0, 0, 6.283); ctx.fill();
+  if (cmd) { ctx.fillStyle = pal.metal; ctx.beginPath(); ctx.ellipse(0, -s * 1.3 * k + bob, s * 0.22 * k, s * 0.1 * k, 0, 0, 6.283); ctx.fill(); }
+  // weapon
+  ctx.strokeStyle = LOOK.ink; ctx.lineWidth = s * 0.08;
+  const dir = side === 0 ? -1 : 1;
+  if (musket) { ctx.lineWidth = s * 0.1; ctx.beginPath(); ctx.moveTo(-s * 0.35 * k, -s * 0.55 * k + bob); ctx.lineTo(s * 0.55 * k, -s * 0.95 * k + bob + dir * s * 0.1); ctx.stroke(); }
+  else if (scout) { ctx.beginPath(); ctx.moveTo(s * 0.25 * k, -s * 0.7 * k + bob); ctx.lineTo(s * 0.55 * k, -s * 1.0 * k + bob); ctx.stroke(); }
+  else if (cmd) {
+    ctx.beginPath(); ctx.moveTo(s * 0.35 * k, -s * 0.6 * k + bob); ctx.lineTo(s * 0.7 * k, -s * 1.25 * k + bob); ctx.stroke();
+    // standard behind the commander
+    ctx.beginPath(); ctx.moveTo(-s * 0.4 * k, -s * 0.3 * k + bob); ctx.lineTo(-s * 0.4 * k, -s * 2.0 * k + bob); ctx.stroke();
+    ctx.fillStyle = pal.flag; const w = Math.sin(ph * 0.7) * s * 0.1;
+    ctx.beginPath(); ctx.moveTo(-s * 0.4 * k, -s * 2.0 * k + bob); ctx.lineTo(-s * 1.1 * k, -s * 1.75 * k + bob + w); ctx.lineTo(-s * 0.4 * k, -s * 1.5 * k + bob); ctx.closePath(); ctx.fill();
+  } else { ctx.beginPath(); ctx.moveTo(s * 0.3 * k, -s * 0.2 * k + bob); ctx.lineTo(s * 0.38 * k, -s * 1.55 * k + bob); ctx.stroke(); ctx.fillStyle = pal.metal; ctx.beginPath(); ctx.moveTo(s * 0.38 * k, -s * 1.75 * k + bob); ctx.lineTo(s * 0.3 * k, -s * 1.5 * k + bob); ctx.lineTo(s * 0.46 * k, -s * 1.5 * k + bob); ctx.closePath(); ctx.fill(); }
+  // shield
+  if (!musket && !scout) { ctx.fillStyle = pal.metal; ctx.beginPath(); ctx.arc(-s * 0.3 * k, -s * 0.6 * k + bob, s * 0.2 * k, 0, 6.283); ctx.fill(); ctx.fillStyle = pal.dark; ctx.beginPath(); ctx.arc(-s * 0.3 * k, -s * 0.6 * k + bob, s * 0.07 * k, 0, 6.283); ctx.fill(); }
+}
+
+function drawHorse(ctx, s, pal, ph, side) {
+  const leg = Math.sin(ph) * s * 0.3;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#3a2a1e'; ctx.lineWidth = s * 0.16;
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.5, -s * 0.5); ctx.lineTo(-s * 0.55 + leg, s * 0.1); ctx.moveTo(-s * 0.3, -s * 0.5); ctx.lineTo(-s * 0.3 - leg, s * 0.1);
+  ctx.moveTo(s * 0.3, -s * 0.5); ctx.lineTo(s * 0.3 - leg, s * 0.1); ctx.moveTo(s * 0.5, -s * 0.5); ctx.lineTo(s * 0.55 + leg, s * 0.1);
+  ctx.stroke();
+  ctx.fillStyle = '#5a3f2a';
+  ctx.beginPath(); ctx.ellipse(0, -s * 0.7, s * 0.75, s * 0.33, 0, 0, 6.283); ctx.fill();
+  // neck and head
+  ctx.beginPath(); ctx.moveTo(s * 0.5, -s * 0.8); ctx.lineTo(s * 0.9, -s * 1.4); ctx.lineTo(s * 1.15, -s * 1.3); ctx.lineTo(s * 0.75, -s * 0.6); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.moveTo(s * 0.55, -s * 0.95); ctx.lineTo(s * 0.85, -s * 1.45); ctx.lineTo(s * 0.7, -s * 0.9); ctx.closePath(); ctx.fill();
+  // saddle cloth
+  ctx.fillStyle = pal.cloth; ctx.fillRect(-s * 0.35, -s * 0.9, s * 0.7, s * 0.32);
+  // rider
+  ctx.fillStyle = pal.body; ctx.beginPath(); ctx.moveTo(-s * 0.22, -s * 1.5); ctx.lineTo(s * 0.22, -s * 1.5); ctx.lineTo(s * 0.28, -s * 0.85); ctx.lineTo(-s * 0.28, -s * 0.85); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#c98a5a'; ctx.beginPath(); ctx.arc(0, -s * 1.68, s * 0.18, 0, 6.283); ctx.fill();
+  ctx.fillStyle = pal.cloth; ctx.beginPath(); ctx.ellipse(0, -s * 1.8, s * 0.24, s * 0.12, 0, 0, 6.283); ctx.fill();
+  // lance
+  ctx.strokeStyle = LOOK.ink; ctx.lineWidth = s * 0.08; ctx.beginPath(); ctx.moveTo(s * 0.2, -s * 1.0); ctx.lineTo(s * 1.3, -s * 1.9); ctx.stroke();
+  ctx.fillStyle = pal.metal; ctx.beginPath(); ctx.arc(s * 1.3, -s * 1.9, s * 0.09, 0, 6.283); ctx.fill();
+}
+
+function drawElephant(ctx, s, pal, ph) {
+  const leg = Math.sin(ph * 0.5) * s * 0.18;
+  ctx.fillStyle = '#6e6a66';
+  ctx.fillRect(-s * 0.9, -s * 0.7, s * 0.35, s * 0.9 + leg); ctx.fillRect(-s * 0.35, -s * 0.7, s * 0.35, s * 0.9 - leg);
+  ctx.fillRect(s * 0.1, -s * 0.7, s * 0.35, s * 0.9 - leg); ctx.fillRect(s * 0.6, -s * 0.7, s * 0.35, s * 0.9 + leg);
+  ctx.fillStyle = '#7d7975'; ctx.beginPath(); ctx.ellipse(-s * 0.05, -s * 1.2, s * 1.2, s * 0.75, 0, 0, 6.283); ctx.fill();
+  // head and trunk
+  ctx.beginPath(); ctx.arc(s * 1.0, -s * 1.35, s * 0.55, 0, 6.283); ctx.fill();
+  ctx.fillStyle = '#6e6a66'; ctx.beginPath(); ctx.ellipse(s * 0.75, -s * 1.5, s * 0.35, s * 0.45, 0, 0, 6.283); ctx.fill();
+  ctx.strokeStyle = '#7d7975'; ctx.lineWidth = s * 0.22; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(s * 1.35, -s * 1.1); ctx.quadraticCurveTo(s * 1.75, -s * 0.5, s * 1.55 + Math.sin(ph * 0.5) * s * 0.1, s * 0.0); ctx.stroke();
+  ctx.strokeStyle = '#e9e2cf'; ctx.lineWidth = s * 0.1; ctx.beginPath(); ctx.moveTo(s * 1.2, -s * 1.0); ctx.lineTo(s * 1.75, -s * 0.85); ctx.stroke();
+  // howdah and cloth
+  ctx.fillStyle = pal.cloth; ctx.fillRect(-s * 0.9, -s * 1.55, s * 1.5, s * 0.5);
+  ctx.fillStyle = pal.body; ctx.fillRect(-s * 0.75, -s * 2.2, s * 1.2, s * 0.7);
+  ctx.fillStyle = pal.metal; ctx.fillRect(-s * 0.75, -s * 2.25, s * 1.2, s * 0.08);
+  ctx.fillStyle = '#c98a5a'; ctx.beginPath(); ctx.arc(-s * 0.15, -s * 2.4, s * 0.17, 0, 6.283); ctx.fill();
+  ctx.fillStyle = pal.cloth; ctx.beginPath(); ctx.ellipse(-s * 0.15, -s * 2.52, s * 0.22, s * 0.11, 0, 0, 6.283); ctx.fill();
+}
+
+function drawCart(ctx, s, pal, ph) {
+  ctx.fillStyle = '#4a3626';
+  ctx.beginPath(); ctx.arc(-s * 0.6, -s * 0.2, s * 0.38, 0, 6.283); ctx.fill();
+  ctx.beginPath(); ctx.arc(s * 0.6, -s * 0.2, s * 0.38, 0, 6.283); ctx.fill();
+  ctx.strokeStyle = '#8a6a4a'; ctx.lineWidth = s * 0.07;
+  for (const wx of [-s * 0.6, s * 0.6]) for (let k = 0; k < 3; k++) { const a = ph * 0.6 + k * 1.047; ctx.beginPath(); ctx.moveTo(wx - Math.cos(a) * s * 0.3, -s * 0.2 - Math.sin(a) * s * 0.3); ctx.lineTo(wx + Math.cos(a) * s * 0.3, -s * 0.2 + Math.sin(a) * s * 0.3); ctx.stroke(); }
+  ctx.fillStyle = '#6a4e36'; ctx.fillRect(-s * 0.9, -s * 1.0, s * 1.8, s * 0.6);
+  // rocket rack
+  ctx.fillStyle = pal.metal;
+  for (let k = 0; k < 4; k++) { ctx.save(); ctx.translate(-s * 0.5 + k * s * 0.33, -s * 1.0); ctx.rotate(-0.6); ctx.fillRect(-s * 0.07, -s * 1.1, s * 0.14, s * 1.1); ctx.fillStyle = pal.body; ctx.fillRect(-s * 0.09, -s * 1.25, s * 0.18, s * 0.2); ctx.fillStyle = pal.metal; ctx.restore(); }
+  ctx.fillStyle = pal.body; ctx.beginPath(); ctx.arc(s * 1.0, -s * 1.25, s * 0.16, 0, 6.283); ctx.fill();
+  ctx.fillStyle = pal.cloth; ctx.beginPath(); ctx.ellipse(s * 1.0, -s * 1.37, s * 0.2, s * 0.1, 0, 0, 6.283); ctx.fill();
+}
+
+function drawGun(ctx, s, pal, ph, side) {
+  ctx.fillStyle = '#4a3626';
+  ctx.beginPath(); ctx.arc(-s * 0.5, -s * 0.2, s * 0.45, 0, 6.283); ctx.fill();
+  ctx.beginPath(); ctx.arc(s * 0.5, -s * 0.2, s * 0.45, 0, 6.283); ctx.fill();
+  ctx.strokeStyle = '#8a6a4a'; ctx.lineWidth = s * 0.08;
+  for (const wx of [-s * 0.5, s * 0.5]) for (let k = 0; k < 3; k++) { const a = ph * 0.4 + k * 1.047; ctx.beginPath(); ctx.moveTo(wx - Math.cos(a) * s * 0.36, -s * 0.2 - Math.sin(a) * s * 0.36); ctx.lineTo(wx + Math.cos(a) * s * 0.36, -s * 0.2 + Math.sin(a) * s * 0.36); ctx.stroke(); }
+  ctx.fillStyle = '#6a4e36'; ctx.fillRect(-s * 0.7, -s * 0.9, s * 1.4, s * 0.45);
+  ctx.save(); ctx.translate(0, -s * 0.95); ctx.rotate(side === 0 ? -0.5 : -0.5);
+  ctx.fillStyle = '#2f2a26'; ctx.fillRect(-s * 0.22, -s * 1.8, s * 0.44, s * 2.0);
+  ctx.fillStyle = pal.metal; ctx.fillRect(-s * 0.25, -s * 1.1, s * 0.5, s * 0.12); ctx.fillRect(-s * 0.25, -s * 1.8, s * 0.5, s * 0.12);
+  ctx.restore();
+  ctx.fillStyle = pal.body; ctx.beginPath(); ctx.arc(-s * 1.0, -s * 1.1, s * 0.16, 0, 6.283); ctx.fill();
+  ctx.fillStyle = pal.cloth; ctx.beginPath(); ctx.ellipse(-s * 1.0, -s * 1.22, s * 0.2, s * 0.1, 0, 0, 6.283); ctx.fill();
+}
+function drawHanumanFigure(ctx, s, ph) {
+  // a leaping figure, mace over the shoulder, long tail. Gold on the field, never a face in detail.
+  ctx.fillStyle = LOOK.epic;
+  ctx.beginPath(); ctx.moveTo(-s * 0.35, -s * 1.1); ctx.lineTo(s * 0.35, -s * 1.1); ctx.lineTo(s * 0.4, -s * 0.3); ctx.lineTo(-s * 0.4, -s * 0.3); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, -s * 1.35, s * 0.26, 0, 6.283); ctx.fill();
+  ctx.strokeStyle = LOOK.epic; ctx.lineWidth = s * 0.18; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-s * 0.2, -s * 0.35); ctx.lineTo(-s * 0.7, s * 0.1); ctx.moveTo(s * 0.2, -s * 0.35); ctx.lineTo(s * 0.6, -s * 0.2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-s * 0.4, -s * 0.5); ctx.quadraticCurveTo(-s * 1.3, -s * 0.8, -s * 1.1, -s * 1.8); ctx.stroke();
+  ctx.strokeStyle = '#7a4a10'; ctx.lineWidth = s * 0.12; ctx.beginPath(); ctx.moveTo(s * 0.3, -s * 0.9); ctx.lineTo(s * 0.9, -s * 1.7); ctx.stroke();
+  ctx.fillStyle = '#7a4a10'; ctx.beginPath(); ctx.arc(s * 0.95, -s * 1.78, s * 0.22, 0, 6.283); ctx.fill();
+  ctx.fillStyle = LOOK.red; ctx.fillRect(-s * 0.4, -s * 0.6, s * 0.8, s * 0.12);
+}
+
+// ---------- effects ----------
+function lighten(hex, k) { const n = parseInt(String(hex).replace('#', ''), 16); const r = n >> 16, g = (n >> 8) & 255, b = n & 255; const m = function (c) { return Math.round(c + (255 - c) * k); }; return 'rgb(' + m(r) + ',' + m(g) + ',' + m(b) + ')'; }
+function drawFx(ctx, L, M, fx, now) {
+  const u = L.unit;
+  for (const f of fx) {
+    const k = (now - f.t0) / f.dur, p = toScreen(L, f.x, f.y);
+    if (k >= 1) continue;
+    if (f.kind === 'hit') {
+      ctx.strokeStyle = f.tower ? '#ffd27a' : '#fff1d0'; ctx.lineWidth = 2; ctx.globalAlpha = 1 - k;
+      for (let i = 0; i < 4; i++) { const a = i * 1.57 + 0.4, r = u * (0.3 + k * 0.6); ctx.beginPath(); ctx.moveTo(p.x + Math.cos(a) * u * 0.15, p.y - u * 0.6 + Math.sin(a) * u * 0.15); ctx.lineTo(p.x + Math.cos(a) * r, p.y - u * 0.6 + Math.sin(a) * r); ctx.stroke(); }
+      ctx.globalAlpha = 1;
+    } else if (f.kind === 'num') {
+      ctx.globalAlpha = 1 - k; ctx.fillStyle = f.side === 0 ? '#ffe9a8' : '#ffb3a0'; ctx.font = 'bold ' + Math.round(u * 0.7) + 'px system-ui, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(f.text, p.x, p.y - u * 1.4 - k * u * 1.2); ctx.globalAlpha = 1;
+    } else if (f.kind === 'shot') {
+      const q = toScreen(L, f.tx, f.ty); ctx.strokeStyle = 'rgba(255,230,160,' + (1 - k) + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(p.x, p.y - u * 2); ctx.lineTo(q.x, q.y - u * 0.6); ctx.stroke();
+    } else if (f.kind === 'towerfall') {
+      ctx.fillStyle = 'rgba(120,100,80,' + (1 - k) * 0.9 + ')';
+      for (let i = 0; i < 12; i++) { const a = i * 0.52, r = u * (0.5 + k * 3.5); ctx.fillRect(p.x + Math.cos(a) * r - 3, p.y - u * 1.2 + Math.sin(a) * r * 0.6 - k * u * 2 + k * k * u * 4 - 3, 6, 6); }
+    } else if (f.kind === 'charge') {
+      ctx.strokeStyle = 'rgba(255,255,255,' + (1 - k) + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(p.x, p.y, u * (0.5 + k * 1.5), u * (0.25 + k * 0.7), 0, 0, 6.283); ctx.stroke();
+    } else if (f.kind === 'drums') {
+      ctx.strokeStyle = 'rgba(245,192,74,' + (1 - k) + ')'; ctx.lineWidth = 3;
+      for (let i = 0; i < 3; i++) { const kk = Math.max(0, k - i * 0.15); ctx.beginPath(); ctx.ellipse(p.x, p.y, u * kk * 6, u * kk * 3, 0, 0, 6.283); ctx.stroke(); }
+    } else if (f.kind === 'nightraid') {
+      ctx.fillStyle = 'rgba(10,8,20,' + (1 - k) * 0.45 + ')'; ctx.fillRect(L.fx, L.fy, L.fw, L.fh);
+      ctx.fillStyle = 'rgba(255,230,160,' + (1 - k) + ')'; ctx.beginPath(); ctx.arc(p.x, p.y - u, u * (0.3 + k * 2), 0, 6.283); ctx.fill();
+    } else if (f.kind === 'hanuman') {
+      // leaps in from the side of the lane, lifts the victim, leaps off the top
+      const fromX = f.lane === 0 ? L.fx - u * 4 : L.fx + L.fw + u * 4;
+      const a = k < 0.45 ? k / 0.45 : 1, b = k > 0.55 ? (k - 0.55) / 0.45 : 0;
+      const x = k < 0.5 ? fromX + (p.x - fromX) * a : p.x + (fromX - p.x) * b * 0.4;
+      const y = k < 0.5 ? p.y - Math.sin(a * 3.1416) * u * 6 : p.y - b * L.fh * 0.9 - Math.sin(b * 1.57) * u * 2;
+      ctx.save(); ctx.translate(x, y); ctx.scale(f.lane === 0 ? 1 : -1, 1); drawHanumanFigure(ctx, u * 1.6, now); ctx.restore();
+      if (k > 0.5) { ctx.save(); ctx.translate(x, y - u * 1.6); ctx.globalAlpha = 0.9; drawCardFigure(ctx, RB.CARDS[f.victim], u * 0.8, M, 1 - f.side); ctx.restore(); }
+      ctx.globalAlpha = 1;
+    } else if (f.kind === 'civrule') {
+      ctx.strokeStyle = f.col; ctx.lineWidth = 2.5; ctx.globalAlpha = (1 - k) * 0.9;
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, u * (0.4 + k * 2.2), u * (0.2 + k * 1.0), 0, 0, 6.283); ctx.stroke();
+      ctx.globalAlpha = (1 - k) * 0.22; ctx.fillStyle = f.col; ctx.fill();
+      ctx.globalAlpha = Math.min(1, (1 - k) * 2); ctx.font = 'bold ' + Math.round(u * 0.62) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const tw = ctx.measureText(f.text).width + u * 0.9, ty = p.y - u * 2.4 - k * u * 1.2;
+      ctx.fillStyle = 'rgba(12,9,6,0.7)'; roundRect(ctx, p.x - tw / 2, ty - u * 0.55, tw, u * 1.1, u * 0.55); ctx.fill();
+      ctx.strokeStyle = lighten(f.col, 0.25); ctx.lineWidth = 1.5; roundRect(ctx, p.x - tw / 2, ty - u * 0.55, tw, u * 1.1, u * 0.55); ctx.stroke();
+      ctx.fillStyle = lighten(f.col, 0.55); ctx.fillText(f.text, p.x, ty + 1); ctx.globalAlpha = 1;
+    } else if (f.kind === 'hero') {
+      ctx.save(); ctx.globalAlpha = (1 - k) * 0.28; ctx.fillStyle = f.col; ctx.fillRect(L.fx, L.fy, L.fw, L.fh); ctx.restore();
+      ctx.strokeStyle = '#fff6dc'; ctx.lineWidth = 4 * (1 - k) + 1;
+      for (let i = 0; i < 3; i++) { const kk = Math.max(0, k * 1.3 - i * 0.12); if (kk <= 0 || kk >= 1) continue; ctx.globalAlpha = 1 - kk; ctx.beginPath(); ctx.ellipse(p.x, p.y, u * kk * 9, u * kk * 4.2, 0, 0, 6.283); ctx.stroke(); }
+      ctx.globalAlpha = 1;
+      // the banner: the move's name across the field
+      const a = k < 0.15 ? k / 0.15 : (k > 0.7 ? (1 - k) / 0.3 : 1), by = L.fy + L.fh * 0.5 - u * 3 + (1 - Math.min(1, k * 6)) * u * 1.5;
+      ctx.save(); ctx.globalAlpha = Math.max(0, a); ctx.fillStyle = 'rgba(10,8,6,0.78)'; ctx.fillRect(L.fx, by - u * 1.25, L.fw, u * 2.5);
+      ctx.fillStyle = lighten(f.col, 0.3); ctx.fillRect(L.fx, by - u * 1.25, L.fw, 2); ctx.fillRect(L.fx, by + u * 1.25 - 2, L.fw, 2);
+      ctx.font = 'bold ' + Math.round(u * 1.5) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff6dc'; ctx.fillText(f.text.toUpperCase(), L.fx + L.fw / 2, by - u * 0.1);
+      ctx.font = Math.round(u * 0.6) + 'px system-ui, sans-serif'; ctx.fillStyle = lighten(f.col, 0.6); ctx.fillText(f.sub || '', L.fx + L.fw / 2, by + u * 0.85);
+      ctx.restore();
+    } else if (f.kind === 'spell') {
+      // a wave sweeps the whole lane from the caster's end to the far end
+      const x0 = L.fx + f.lane * L.fw / 2, w = L.fw / 2, dir = f.side === 0 ? -1 : 1;
+      ctx.save(); ctx.beginPath(); ctx.rect(x0, L.fy, w, L.fh); ctx.clip();
+      ctx.globalAlpha = (1 - k) * 0.35; ctx.fillStyle = f.col; ctx.fillRect(x0, L.fy, w, L.fh);
+      const front = f.side === 0 ? L.fy + L.fh - Math.min(1, k * 1.6) * L.fh : L.fy + Math.min(1, k * 1.6) * L.fh;
+      ctx.globalAlpha = 1 - k * 0.6; ctx.strokeStyle = '#fff6dc'; ctx.lineWidth = 3;
+      for (let i = 0; i < 3; i++) { const yy = front - dir * -1 * i * u * 0.8; ctx.beginPath(); ctx.moveTo(x0, yy); for (let x = 0; x <= w; x += w / 8) ctx.lineTo(x0 + x, yy + Math.sin(x * 0.2 + now * 20) * u * 0.25); ctx.stroke(); }
+      ctx.fillStyle = '#fff6dc'; for (let i = 0; i < 14; i++) { const px = x0 + ((i * 0.6180339) % 1) * w, py = front + (((i * 0.3819) % 1) - 0.5) * u * 4; ctx.globalAlpha = 1 - k; ctx.fillRect(px, py, 3, 3); }
+      ctx.restore(); ctx.globalAlpha = 1;
+    } else if (f.kind === 'fall') {
+      // nothing extra: the unit itself fades and tips
+    }
+  }
+}
+
+// ---------- HUD ----------
+function towersLeft(M, side) { return Math.max(0, 3 - M.players[side].towersLost); }
+function drawPips(ctx, x, y, n, d, col, align) {
+  for (let i = 0; i < 3; i++) { const cx = align === 'right' ? x - d * 0.5 - i * d * 1.5 : x + d * 0.5 + i * d * 1.5; ctx.fillStyle = i < n ? col : 'rgba(255,255,255,0.12)'; ctx.fillRect(cx - d * 0.45, y - d * 0.6, d * 0.9, d * 1.2); ctx.fillRect(cx - d * 0.45, y - d * 0.9, d * 0.28, d * 0.3); ctx.fillRect(cx + d * 0.17, y - d * 0.9, d * 0.28, d * 0.3); }
+}
+function drawHud(ctx, L, M, view, now) {
+  const u = L.unit, W = L.W, T = L.top;
+  ctx.fillStyle = LOOK.bg; ctx.fillRect(0, 0, W, L.fy);
+  const left = Math.max(0, RB.MATCH.seconds - M.t);
+  const over = M.sudden ? Math.max(0, RB.MATCH.seconds + RB.MATCH.overtime - M.t) : left;
+  const mm = Math.floor(over / 60), ss = Math.floor(over % 60);
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center'; ctx.fillStyle = M.sudden ? LOOK.red : (left < 60 ? LOOK.energy : LOOK.paper);
+  ctx.font = 'bold ' + Math.round(T * 0.46) + 'px system-ui, sans-serif';
+  ctx.fillText(mm + ':' + (ss < 10 ? '0' : '') + ss, W / 2, T * 0.42);
+  ctx.font = Math.round(T * 0.21) + 'px system-ui, sans-serif'; ctx.fillStyle = M.sudden ? LOOK.red : LOOK.haze;
+  ctx.fillText(M.sudden ? 'SUDDEN DEATH' : (left < 60 ? 'DOUBLE ENERGY' : 'EPOCH'), W / 2, T * 0.82);
+  // each side: crest, civ name, towers left
+  const cr = T * 0.34;
+  for (const side of [view.side, 1 - view.side]) {
+    const mine = side === view.side, key = civKey(M, side), info = civInfo(key), pal = civPal(key);
+    const cx = mine ? u * 0.8 + cr : W - u * 0.8 - cr;
+    drawCrest(ctx, key, cx, T * 0.5, cr, false);
+    ctx.textAlign = mine ? 'left' : 'right';
+    const tx = mine ? cx + cr + u * 0.5 : cx - cr - u * 0.5;
+    ctx.fillStyle = LOOK.paper; ctx.font = 'bold ' + Math.round(T * 0.26) + 'px system-ui, sans-serif';
+    ctx.fillText(info.name || key, tx, T * 0.34);
+    drawPips(ctx, tx, T * 0.74, towersLeft(M, side), T * 0.14, mine ? pal.body : '#d9604c', mine ? 'left' : 'right');
+  }
+  // log line just under the top band
+  const last = M.log[M.log.length - 1];
+  if (last && M.t - last.t < 3.5) {
+    ctx.font = Math.round(u * 0.75) + 'px system-ui, sans-serif';
+    ctx.globalAlpha = Math.min(1, (3.5 - (M.t - last.t)) * 1.5);
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; const tw = ctx.measureText(last.text).width + u * 2; ctx.fillRect(W / 2 - tw / 2, L.fy + u * 0.4, tw, u * 1.3);
+    ctx.fillStyle = LOOK.paper; ctx.textAlign = 'center'; ctx.fillText(last.text, W / 2, L.fy + u * 1.05);
+    ctx.globalAlpha = 1;
+  }
+  const by = L.H - L.bottom;
+  ctx.fillStyle = LOOK.bg; ctx.fillRect(0, by, W, L.bottom);
+  const P = M.players[view.side];
+  drawDrum(ctx, L, P.energy, now, view);
+  drawHand(ctx, L, M, P, view, now);
+}
+
+function drawDrum(ctx, L, energy, now, view) {
+  const u = L.unit, W = L.W, by = L.H - L.bottom;
+  const x0 = u * 0.8, w = W - u * 1.6, h = u * 1.1, y = by + u * 0.5;
+  ctx.fillStyle = '#3b2a1c'; roundRect(ctx, x0 - 4, y - 4, w + 8, h + 8, 8); ctx.fill();
+  ctx.fillStyle = LOOK.energyDim; roundRect(ctx, x0, y, w, h, 6); ctx.fill();
+  const segs = RB.MATCH.energyMax, gap = 3, sw = (w - gap * (segs - 1)) / segs;
+  const beat = view.beat ? Math.max(0, 1 - (now - view.beat) * 6) : 0;
+  for (let i = 0; i < segs; i++) {
+    const f = Math.max(0, Math.min(1, energy - i));
+    if (f <= 0) continue;
+    ctx.fillStyle = LOOK.energy; ctx.globalAlpha = 0.65 + 0.35 * f + beat * 0.2;
+    roundRect(ctx, x0 + i * (sw + gap), y + 2, sw * f, h - 4, 3); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#7a5a3a';
+  for (let i = 0; i <= segs; i++) { const x = x0 + i * (sw + gap) - gap / 2; ctx.beginPath(); ctx.arc(Math.max(x0 + 2, Math.min(x0 + w - 2, x)), y - 4, 2.2, 0, 6.283); ctx.fill(); ctx.beginPath(); ctx.arc(Math.max(x0 + 2, Math.min(x0 + w - 2, x)), y + h + 4, 2.2, 0, 6.283); ctx.fill(); }
+  ctx.fillStyle = LOOK.paper; ctx.font = 'bold ' + Math.round(u * 0.75) + 'px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText(Math.floor(energy), x0 + u * 0.4, y + h / 2);
+}
+
+function handRects(L) {
+  const u = L.unit, W = L.W, by = L.H - L.bottom;
+  const y = by + u * 2.0, h = L.bottom - u * 2.4, nextW = u * 1.8;
+  const x0 = u * 0.8 + nextW + u * 0.5, w = (W - x0 - u * 0.8 - 3 * u * 0.4) / 4;
+  const r = [];
+  for (let i = 0; i < 4; i++) r.push({ x: x0 + i * (w + u * 0.4), y: y, w: w, h: h });
+  return { cards: r, next: { x: u * 0.8, y: y + h * 0.35, w: nextW, h: h * 0.65 } };
+}
+
+function drawSpellGlyph(ctx, s, col) {
+  ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = s * 0.12; ctx.lineCap = 'round';
+  ctx.beginPath(); for (let i = 0; i < 16; i++) { const a = i * 0.3927, r = i % 2 ? s * 0.45 : s * 1.1; ctx.lineTo(Math.cos(a) * r, -s * 0.9 + Math.sin(a) * r); } ctx.closePath(); ctx.globalAlpha = 0.9; ctx.fill(); ctx.globalAlpha = 1;
+  ctx.fillStyle = '#fff6dc'; ctx.beginPath(); ctx.arc(0, -s * 0.9, s * 0.3, 0, 6.283); ctx.fill();
+}
+
+function drawHand(ctx, L, M, P, view, now) {
+  const u = L.unit, R = handRects(L);
+  ctx.textBaseline = 'middle';
+  for (let i = 0; i < 4; i++) {
+    const id = P.hand[i]; if (!id) continue;
+    const c = RB.CARDS[id], r = R.cards[i], can = P.energy >= c.cost, held = view.holding === id;
+    const role = roleOf(c), hero = role === 'hero', spell = role === 'spell';
+    const pal = civPal(c.civ || c.faction), edge = hero ? LOOK.epic : (spell ? '#a878e0' : pal.body);
+    const lift = held ? -u * 0.6 : 0, y = r.y + lift;
+    // body
+    const gr = ctx.createLinearGradient(0, y, 0, y + r.h); gr.addColorStop(0, held ? '#46372a' : '#33291f'); gr.addColorStop(1, held ? '#2c2219' : '#1f1812');
+    ctx.fillStyle = gr; roundRect(ctx, r.x, y, r.w, r.h, 8); ctx.fill();
+    ctx.save(); roundRect(ctx, r.x, y, r.w, r.h, 8); ctx.clip();
+    ctx.fillStyle = edge; ctx.globalAlpha = can ? 0.9 : 0.35; ctx.fillRect(r.x, y + r.h - u * 1.55, r.w, u * 1.55); ctx.globalAlpha = 1;
+    if (hero) { const sh = ctx.createLinearGradient(r.x, y, r.x + r.w, y + r.h); sh.addColorStop(0, 'rgba(245,192,74,0.25)'); sh.addColorStop(1, 'rgba(245,192,74,0)'); ctx.fillStyle = sh; ctx.fillRect(r.x, y, r.w, r.h); }
+    ctx.restore();
+    ctx.strokeStyle = held ? '#fff1c0' : (can ? edge : '#3a3028'); ctx.lineWidth = held ? 2.5 : (hero ? 2.2 : 1.5); roundRect(ctx, r.x, y, r.w, r.h, 8); ctx.stroke();
+    // figure
+    ctx.save(); ctx.beginPath(); ctx.rect(r.x + 2, y + 2, r.w - 4, r.h - u * 1.55 - 2); ctx.clip();
+    ctx.translate(r.x + r.w / 2, y + r.h - u * 1.55 - r.h * 0.04); if (!can) ctx.globalAlpha = 0.45;
+    const boxH = r.h - u * 1.55 - u * 1.2;
+    if (spell && (RB.drawFigure || c.body !== 'epic')) drawSpellGlyph(ctx, Math.min(r.w, boxH) * 0.33, pal.body);
+    else drawCardFigure(ctx, c, Math.min(r.w, r.h) * 0.22, M, view.side, boxH);
+    ctx.restore();
+    // name on the coloured foot
+    ctx.fillStyle = can ? '#fff6dc' : '#a39a8a'; ctx.font = 'bold ' + Math.round(u * 0.58) + 'px system-ui, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(c.name, r.x + r.w / 2, y + r.h - u * 0.78, r.w - 6);
+    // cost badge, top left
+    ctx.fillStyle = can ? LOOK.energy : LOOK.energyDim; ctx.beginPath(); ctx.arc(r.x + u * 0.75, y + u * 0.75, u * 0.58, 0, 6.283); ctx.fill();
+    ctx.strokeStyle = '#17120d'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = LOOK.ink; ctx.font = 'bold ' + Math.round(u * 0.74) + 'px system-ui, sans-serif'; ctx.fillText(String(c.cost), r.x + u * 0.75, y + u * 0.8);
+    // role icon, top right
+    ctx.globalAlpha = can ? 1 : 0.55; roleBadge(ctx, role, r.x + r.w - u * 0.8, y + u * 0.8, u * 1.3); ctx.globalAlpha = 1;
+    if (hero || spell) { ctx.fillStyle = hero ? LOOK.epic : '#c9a2f4'; ctx.font = 'bold ' + Math.round(u * 0.4) + 'px system-ui, sans-serif'; ctx.fillText(hero ? 'HERO' : 'SPELL', r.x + r.w / 2, y + u * 0.62); }
+  }
+  // next card
+  const n = R.next, nc = RB.CARDS[P.next];
+  ctx.fillStyle = '#211a14'; roundRect(ctx, n.x, n.y, n.w, n.h, 6); ctx.fill();
+  ctx.strokeStyle = '#3a3028'; ctx.lineWidth = 1; roundRect(ctx, n.x, n.y, n.w, n.h, 6); ctx.stroke();
+  if (nc) {
+    ctx.save(); ctx.beginPath(); ctx.rect(n.x, n.y, n.w, n.h); ctx.clip(); ctx.translate(n.x + n.w / 2, n.y + n.h * 0.82); ctx.globalAlpha = 0.75;
+    if (roleOf(nc) === 'spell' && (RB.drawFigure || nc.body !== 'epic')) drawSpellGlyph(ctx, n.w * 0.2, civPal(nc.civ || nc.faction).body); else drawCardFigure(ctx, nc, n.w * 0.2, M, view.side, n.h * 0.6);
+    ctx.restore();
+  }
+  ctx.fillStyle = '#8a7f70'; ctx.font = Math.round(u * 0.45) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('next', n.x + n.w / 2, n.y - u * 0.4);
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+}
+
+// ---------- the whole frame ----------
+// view.cam = { z: zoom (1 = none), x, y: screen point the zoom centres on }
+function drawMatch(ctx, L, M, view, fx, now) {
+  ctx.fillStyle = LOOK.bg; ctx.fillRect(0, 0, L.W, L.H);
+  ctx.save();
+  if (view.shake > 0) { ctx.translate((Math.random() - 0.5) * view.shake * 8, (Math.random() - 0.5) * view.shake * 8); }
+  const cam = view.cam;
+  if (cam && cam.z > 1.0005) { ctx.translate(cam.x, cam.y); ctx.scale(cam.z, cam.z); ctx.translate(-cam.x, -cam.y); }
+  drawGround(ctx, L, M, view);
+  const things = [];
+  for (const t of M.towers) things.push({ y: t.y, tower: t });
+  for (const u of M.units) things.push({ y: u.y, unit: u });
+  things.sort(function (a, b) { return b.y - a.y; });
+  ctx.save(); ctx.beginPath(); ctx.rect(L.fx, L.fy, L.fw, L.fh); ctx.clip();
+  for (const o of things) { if (o.tower) drawTower(ctx, L, M, o.tower, now); else drawUnit(ctx, L, M, o.unit, now, fx); }
+  drawHints(ctx, L, M, view, now);
+  drawFx(ctx, L, M, fx, now);
+  ctx.restore();
+  ctx.restore();
+  drawHintLegend(ctx, L, M, view);
+  drawHud(ctx, L, M, view, now);
+}
+
+RB.LOOK = LOOK; RB.layout = layout; RB.toScreen = toScreen; RB.toField = toField; RB.drawMatch = drawMatch; RB.handRects = handRects;
+RB.roundRect = roundRect; RB.drawCardFigure = drawCardFigure; RB.drawHanumanFigure = drawHanumanFigure; RB.drawMan = drawMan; RB.drawTower = drawTower;
+RB.drawCrest = drawCrest; RB.civKeys = civKeys; RB.civInfo = civInfo; RB.civPal = civPal; RB.canon = canon; RB.roleOf = roleOf; RB.themeFor = themeFor; RB.figHeight = figHeight;
+RB.resetGround = function () { groundCache = null; zoneCache = null; };
+
+})();
+
+</script>
+<script>
+// Epoch. An AZTMM game. (c) 2026 AZTMM HLDGS LLC.
+// 05_game.js: the page. Screens, input, the drum, the feel (hit-stop, slow motion, punch), the bard. One canvas, one loop.
+// Hit-stop and slow motion scale the dt that is fed to RB.tick. Nothing inside RB.tick knows about them.
+
+(function () {
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  let L = null, dpr = 1;
+  const G = {
+    screen: 'title', M: null, ai: null, civ: null, foe: null, temper: 'counter', verdict: '', verdictBy: '', lastT: 0, acc: 0, won: null,
+    clock: 0, freeze: 0, slow: 0, slowAt: null, pendingHit: false, lastStopReal: -9, lastRuleSfx: -9,
+    view: { side: 0, holding: null, hover: null, beat: 0, shake: 0, punch: 0, cam: null, note: null }, fx: []
+  };
+
+  function resize() {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    const W = window.innerWidth, H = window.innerHeight;
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    L = RB.layout(W, H); RB.resetGround();
+  }
+  window.addEventListener('resize', resize); resize();
+
+  function keys() { return RB.civKeys(); }
+  function info(k) { return RB.civInfo(k); }
+  function canon(k) { return RB.canon(k); }
+  function civKey(M, side) { const p = M.players[side]; return p.civ || p.faction; }
+  function pretty(s) { s = String(s || '').replace(/[_-]+/g, ' ').trim(); return s.charAt(0).toUpperCase() + s.slice(1); }
+  function pickDefaultCiv() { const ks = keys(); for (const k of ks) if (canon(k) === 'marathas' || k === 'maratha') return k; return ks[0]; }
+  function rollFoe() { const ks = keys().filter(function (k) { return k !== G.civ; }); G.foe = ks[Math.floor(Math.random() * ks.length)] || G.civ; }
+  G.civ = pickDefaultCiv(); rollFoe();
+
+  // ---------- the drum (WebAudio, all synthesised) ----------
+  const AUD = { ctx: null, on: true, nextBeat: 0, beatI: 0 };
+  function audio() { if (!AUD.ctx) { try { AUD.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AUD.on = false; } } if (AUD.ctx && AUD.ctx.state === 'suspended') AUD.ctx.resume(); return AUD.ctx; }
+  function tone(freq0, freq1, dur, type, gain, when) {
+    const a = audio(); if (!a || !AUD.on) return;
+    const t = when || a.currentTime, o = a.createOscillator(), g = a.createGain();
+    o.type = type || 'sine'; o.frequency.setValueAtTime(freq0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, freq1), t + dur);
+    g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + dur + 0.02);
+  }
+  function noise(dur, gain, hp, when) {
+    const a = audio(); if (!a || !AUD.on) return;
+    const t = when || a.currentTime, n = Math.floor(a.sampleRate * dur), b = a.createBuffer(1, n, a.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const s = a.createBufferSource(), g = a.createGain(), f = a.createBiquadFilter();
+    s.buffer = b; f.type = hp ? 'highpass' : 'lowpass'; f.frequency.value = hp || 900;
+    g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    s.connect(f); f.connect(g); g.connect(a.destination); s.start(t);
+  }
+  // ---------- the drum: one synth, a pattern and a pitch per civ ----------
+  const DRUM = {
+    rome: { p: 'D.d.D.dd', k: 1.0 }, vikings: { p: 'D..DD.d.', k: 0.85 }, marathas: { p: 'D.ddD.d.', k: 1.0 },
+    aztecs: { p: 'DdDd.D.d', k: 1.22 }, samurai: { p: 'D...D.dd', k: 0.8 }, egypt: { p: 'D.d.d.D.', k: 1.1 }, other: { p: 'D.ddD.d.', k: 1.0 }
+  };
+  function dha(when, k) { k = k || 1; tone(140 * k, 48 * k, 0.28, 'sine', 0.5, when); noise(0.05, 0.12, 0, when); }
+  function dhin(when, k) { k = k || 1; tone(380 * k, 200 * k, 0.1, 'triangle', 0.22, when); noise(0.03, 0.15, 2500, when); }
+  function sfx(kind) {
+    if (kind === 'hit') { noise(0.05, 0.08, 2000); tone(900, 300, 0.05, 'square', 0.03); }
+    else if (kind === 'thud') { tone(120, 40, 0.18, 'sine', 0.45); noise(0.06, 0.2, 0); }
+    else if (kind === 'shot') { noise(0.08, 0.1, 1200); }
+    else if (kind === 'towerfall') { tone(90, 30, 0.9, 'sine', 0.7); noise(0.7, 0.45, 0); }
+    else if (kind === 'deploy') { tone(220, 330, 0.08, 'triangle', 0.12); }
+    else if (kind === 'charge') { tone(300, 600, 0.12, 'sawtooth', 0.08); }
+    else if (kind === 'hero') { const a = audio(); if (!a) return; tone(70, 35, 0.8, 'sine', 0.6); tone(220, 440, 0.5, 'sawtooth', 0.07, a.currentTime + 0.05); noise(0.4, 0.2, 600); }
+    else if (kind === 'spell') { const a = audio(); if (!a) return; noise(0.6, 0.18, 1500); tone(300, 900, 0.5, 'triangle', 0.1, a.currentTime); }
+    else if (kind === 'rule') { const a = audio(); if (!a) return; tone(660, 660, 0.18, 'triangle', 0.07, a.currentTime); tone(880, 880, 0.25, 'triangle', 0.06, a.currentTime + 0.07); }
+    else if (kind === 'hanuman') { for (let i = 0; i < 5; i++) tone(330 + i * 110, 330 + i * 110, 0.35, 'triangle', 0.12, audio() && audio().currentTime + i * 0.07); }
+    else if (kind === 'drums') { for (let i = 0; i < 6; i++) dha(audio() && audio().currentTime + i * 0.11); }
+    else if (kind === 'nightraid') { tone(60, 40, 0.6, 'sine', 0.5); }
+    else if (kind === 'win') { const a = audio(); if (!a) return; [262, 330, 392, 523].forEach(function (f, i) { tone(f, f, 0.6, 'sawtooth', 0.08, a.currentTime + i * 0.12); }); tone(523, 523, 1.2, 'sawtooth', 0.1, a.currentTime + 0.5); }
+    else if (kind === 'lose') { const a = audio(); if (!a) return; for (let i = 0; i < 8; i++) dha(a.currentTime + i * 0.09); tone(110, 55, 1.4, 'sine', 0.3, a.currentTime + 0.7); }
+    else if (kind === 'tap') { tone(600, 500, 0.04, 'square', 0.04); }
+  }
+  // The drum paces the match: slow at first, quicker in the last minute, racing in sudden death. It stops dead in a tower's slow motion.
+  function drum(M, now) {
+    const a = audio(); if (!a || !AUD.on || !M || M.over || G.slow > 0) return;
+    const D = DRUM[canon(M.players[0].civ || M.players[0].faction)] || DRUM.other;
+    const bpm = M.sudden ? 168 : (M.t > RB.MATCH.seconds - RB.MATCH.lateAt ? 136 : 104);
+    const beat = 60 / bpm;
+    if (AUD.nextBeat < a.currentTime - 0.5) AUD.nextBeat = a.currentTime + 0.05;
+    while (AUD.nextBeat < a.currentTime + 0.25) {
+      const ch = D.p.charAt(AUD.beatI % 8);
+      if (ch === 'D') dha(AUD.nextBeat, D.k); else if (ch === 'd') dhin(AUD.nextBeat, D.k);
+      if (ch === 'D') G.view.beatAt = AUD.nextBeat;
+      AUD.nextBeat += beat / 2; AUD.beatI++;
+    }
+    if (G.view.beatAt && a.currentTime >= G.view.beatAt) { G.view.beat = now; G.view.beatAt = 0; }
+  }
+
+  // ---------- match ----------
+  function startMatch() {
+    const tempers = ['rush', 'siege', 'counter'];
+    G.temper = tempers[Math.floor(Math.random() * 3)];
+    if (!G.foe || G.foe === G.civ) rollFoe();
+    G.M = RB.newMatch({
+      seed: (Date.now() % 100000) + 1, civ0: G.civ, civ1: G.foe,
+      deck0: RB.DECKS[G.civ], deck1: RB.DECKS[G.foe], faction0: G.civ, faction1: G.foe   // the old rules read deck/faction, the new read civ
+    });
+    G.ai = RB.makeAI(1, G.temper, G.M.rng);
+    const V = G.view; V.side = 0; V.holding = null; V.hover = null; V.shake = 0; V.punch = 0; V.cam = null; V.note = null;
+    G.fx = []; G.endBg = null; G.screen = 'match'; G.verdict = ''; G.won = null;
+    G.acc = 0; G.clock = 0; G.freeze = 0; G.slow = 0; G.pendingHit = false;
+    AUD.nextBeat = 0; AUD.beatI = 0;
+    RB.resetGround();
+  }
+
+  function freeze(sec, rn) { if (rn - G.lastStopReal < 0.18 && sec < 0.1) return; G.freeze = Math.max(G.freeze, sec); G.lastStopReal = rn; }
+  function civCol(key) { return RB.civPal(key).body; }
+
+  function handleEvents(M, gn, rn) {
+    const V = G.view;
+    for (const e of M.events) {
+      if (e.kind === 'hit') {
+        G.fx.push({ kind: 'hit', x: e.x, y: e.y, t0: gn, dur: 0.25, tower: e.tower });
+        if (e.dmg > 50 || e.tower) G.fx.push({ kind: 'num', x: e.x, y: e.y, t0: gn, dur: 0.7, text: String(Math.round(e.dmg)), side: e.side });
+        if (!e.tower) {
+          if (e.role === 'hero') { freeze(0.12, rn); V.shake = Math.max(V.shake, 0.5); sfx('thud'); }
+          else if (e.role === 'blade' || e.role === 'horse' || (!e.role && e.dmg >= 50)) { freeze(0.06, rn); if (Math.random() < 0.5) sfx('thud'); }
+          else if (Math.random() < 0.35) sfx('hit');
+        } else if (Math.random() < 0.5) sfx('hit');
+      }
+      else if (e.kind === 'shot') { G.fx.push({ kind: 'shot', x: e.x, y: e.y, tx: e.tx, ty: e.ty, t0: gn, dur: 0.12 }); if (Math.random() < 0.5) sfx('shot'); }
+      else if (e.kind === 'towerfall') {
+        G.fx.push({ kind: 'towerfall', x: e.x, y: e.y, t0: gn, dur: 1.2 });
+        G.slow = 0.8; G.slowAt = { x: e.x, y: e.y }; G.pendingHit = true; G.freeze = 0;
+      }
+      else if (e.kind === 'deploy') { sfx('deploy'); }
+      else if (e.kind === 'charge') { G.fx.push({ kind: 'charge', x: e.x, y: e.y, t0: gn, dur: 0.4 }); sfx('charge'); }
+      else if (e.kind === 'hero') {
+        const key = civKey(M, e.side), c = RB.CARDS[e.card];
+        G.fx.push({ kind: 'hero', x: e.x, y: e.y, t0: gn, dur: 1.5, col: civCol(key), text: info(key).heroMove || pretty(e.move || (c && c.name) || 'Hero'), sub: (c ? c.name + '  ·  ' : '') + (info(key).name || '') });
+        V.punch = 1; V.shake = Math.max(V.shake, 0.9); sfx('hero');
+      }
+      else if (e.kind === 'spell') {
+        const lane = e.lane !== undefined ? e.lane : (e.x < 0.5 ? 0 : 1), key = civKey(M, e.side);
+        G.fx.push({ kind: 'spell', x: e.x, y: e.y, lane: lane, side: e.side, t0: gn, dur: 1.0, col: civCol(key) });
+        V.shake = Math.max(V.shake, 0.35); sfx('spell');
+      }
+      else if (e.kind === 'civrule') {
+        const rtxt = (info(e.civ || civKey(M, e.side)).ruleName) || pretty(e.rule);
+        if (G.fx.some(function (f) { return f.kind === 'civrule' && f.text === rtxt && gn - f.t0 < 1.2; })) continue;
+        G.fx.push({ kind: 'civrule', x: e.x, y: e.y, t0: gn, dur: 0.9, col: civCol(e.civ || civKey(M, e.side)), text: (info(e.civ || civKey(M, e.side)).ruleName) || pretty(e.rule) });
+        if (rn - G.lastRuleSfx > 0.6) { G.lastRuleSfx = rn; sfx('rule'); }
+      }
+      else if (e.kind === 'drums') { G.fx.push({ kind: 'drums', x: e.x, y: e.y, t0: gn, dur: 1.0 }); sfx('drums'); }
+      else if (e.kind === 'nightraid') { G.fx.push({ kind: 'nightraid', x: e.x, y: e.y, t0: gn, dur: 1.0 }); sfx('nightraid'); V.punch = 0.6; }
+      else if (e.kind === 'hanuman') { G.fx.push({ kind: 'hanuman', x: e.x, y: e.y, lane: e.lane, side: e.side, victim: e.victim, t0: gn, dur: 1.6 }); sfx('hanuman'); }
+      else if (e.kind === 'end') { endMatch(e); }
+    }
+    M.events.length = 0;
+  }
+
+  // ---------- the bard: one line in the winner's voice, in place of a scoreboard ----------
+  // Index: 0 gate down fast, 1 gate down, 2 sudden death, 3 flawless, 4 won on towers, 5 won after losing two or more.
+  const BARD = {
+    rome: [
+      'Before the second trumpet the gate lay open. Rome does not hurry, and still it was quick.',
+      'Gate broken, road clear. The legion walks in as it walks everywhere, in step.',
+      'One tower between a draw and the road home. Rome took it and counted the cost afterwards.',
+      'Not a stone of ours was touched. A tidy day\'s work.',
+      'Their towers fell one by one and ours stood. That is how a wall is meant to work.',
+      'We lost more than we liked and the standards still stand. Rome has done worse and won.'
+    ],
+    vikings: [
+      'Their gate was kindling before the fire in our hall had caught. Skål.',
+      'The gate is split and the ravens are fed. Tell it at the next feast.',
+      'Sudden death, one tower, and the sea ran our way. Pour the ale.',
+      'Our towers never felt a blade. Even the ravens got bored.',
+      'We took more than we lost. The skald will make it longer than it was.',
+      'We bled for it. Two towers gone and still we rowed home with the win.'
+    ],
+    marathas: [
+      'The gate fell before they found their footing. Hill men do not wait.',
+      'The gate is open and the saffron flag is on the wall. Sing it on the way home.',
+      'It came down to one tower and the hills held it for us. They will tell this for years.',
+      'Not one stone of ours was touched. The old men will say it was easy. It was not.',
+      'We took more than they took. A thin margin, but the fort is ours tonight.',
+      'We lost two towers and still came back. The mountain teaches that.'
+    ],
+    aztecs: [
+      'The gate fell while the drums were still warming. The causeway is ours.',
+      'Their gate is broken and the causeway is ours. The lake carried the news home.',
+      'One tower decided it, and the eagles took it. A long night of songs ahead.',
+      'Our towers stood untouched over the water. Not a feather out of place.',
+      'More of their towers fell than ours. Count them twice if you doubt it.',
+      'We lost ground and took it back. The lake city has seen worse.'
+    ],
+    samurai: [
+      'The gate fell in a breath. One cut, and no second needed.',
+      'Their gate is open. The banner goes up and we bow to the field.',
+      'A single tower in sudden death, and the line held. Quiet, as it should be.',
+      'Our walls were never touched. Rake the gravel, it is finished.',
+      'More towers taken than lost. A narrow win is still a win.',
+      'We were cut twice and still stood. Patience wins this kind of day.'
+    ],
+    egypt: [
+      'The gate fell before the dust had settled. It will be written on a wall.',
+      'Their gate is open and our banners fly over the river road.',
+      'Sudden death, one tower, and the sand favoured us. It will be carved.',
+      'Not a block of ours was cracked. Build on, nothing was lost.',
+      'We held more towers than they did at the end. The scribes will keep the count.',
+      'Two of ours fell and we still hold the river. The scribes will leave out that part.'
+    ],
+    other: [
+      'The gate fell early and the field was ours.',
+      'The gate is open and the standard is up.',
+      'It went to sudden death and it went our way.',
+      'Not a tower of ours was touched.',
+      'More of their towers fell than ours.',
+      'We lost two towers and still won the day.'
+    ]
+  };
+  function bard(M, ws) {
+    const wk = civKey(M, ws), lost = M.players[ws].towersLost, why = String(M.reason || '');
+    const gate = why.indexOf('gate') >= 0 || why.indexOf('king') >= 0, sudden = why.indexOf('sudden') >= 0 || (M.sudden && !gate);
+    const i = gate ? (M.t < 100 ? 0 : 1) : (sudden ? 2 : (lost === 0 ? 3 : (lost >= 2 ? 5 : 4)));
+    return (BARD[canon(wk)] || BARD.other)[i];
+  }
+
+  function endMatch(e) {
+    const M = G.M, won = e.winner === G.view.side, ws = (e.winner === 0 || e.winner === 1) ? e.winner : (M.winner === 1 ? 1 : 0);
+    G.won = won; G.verdict = bard(M, ws); G.verdictBy = info(civKey(M, ws)).name || ''; G.winKey = civKey(M, ws);
+    G.view.holding = null;
+    sfx(won ? 'win' : 'lose');
+    setTimeout(function () { G.screen = 'end'; }, G.slow > 0 ? 2300 : 1400);
+  }
+
+  // ---------- input ----------
+  function pos(ev) { const r = canvas.getBoundingClientRect(); const t = ev.touches ? ev.touches[0] : (ev.changedTouches ? ev.changedTouches[0] : ev); return { x: t.clientX - r.left, y: t.clientY - r.top }; }
+  let dragging = false, downAt = null;
+  function cardAt(p) { const R = RB.handRects(L); for (let i = 0; i < 4; i++) { const r = R.cards[i]; if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y - L.unit && p.y <= r.y + r.h) return i; } return -1; }
+  function inField(p) { return p.x >= L.fx && p.x <= L.fx + L.fw && p.y >= L.fy && p.y <= L.fy + L.fh; }
+  function tryPlay(f) {
+    const M = G.M, id = G.view.holding; if (!id || !M || M.over) return;
+    const r = RB.playCard(M, G.view.side, id, f.x, f.y);
+    if (r.ok) { G.view.holding = null; }
+    else { G.view.note = { text: r.why === 'energy' ? 'Not enough energy' : (r.why === 'not your ground' ? 'Your own ground, or past a fallen tower' : r.why), t: performance.now() / 1000 }; }
+  }
+  function hitRect(p, r) { return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h; }
+  function down(ev) {
+    ev.preventDefault(); audio();
+    const p = pos(ev); downAt = p;
+    if (G.screen === 'title') { titleTap(p); return; }
+    if (G.screen === 'end') { endTap(p); return; }
+    if (G.screen !== 'match') return;
+    const ci = cardAt(p);
+    if (ci >= 0) { const id = G.M.players[G.view.side].hand[ci]; G.view.holding = (G.view.holding === id) ? null : id; dragging = true; sfx('tap'); return; }
+    if (inField(p) && G.view.holding) { tryPlay(RB.toField(L, p.x, p.y)); return; }
+  }
+  function move(ev) {
+    if (G.screen !== 'match') return;
+    ev.preventDefault(); const p = pos(ev);
+    G.view.hover = inField(p) ? RB.toField(L, p.x, p.y) : null;
+  }
+  function up(ev) {
+    if (G.screen !== 'match') { dragging = false; return; }
+    ev.preventDefault(); const p = pos(ev);
+    if (dragging && G.view.holding && inField(p) && downAt && Math.hypot(p.x - downAt.x, p.y - downAt.y) > L.unit) tryPlay(RB.toField(L, p.x, p.y));
+    dragging = false;
+  }
+  canvas.addEventListener('mousedown', down); canvas.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+  canvas.addEventListener('touchstart', down, { passive: false }); canvas.addEventListener('touchmove', move, { passive: false }); window.addEventListener('touchend', up, { passive: false });
+  window.addEventListener('keydown', function (ev) {
+    if (G.screen === 'match' && ev.key >= '1' && ev.key <= '4') { const id = G.M.players[G.view.side].hand[+ev.key - 1]; G.view.holding = G.view.holding === id ? null : id; }
+    if (G.screen === 'title' && ev.key >= '1' && ev.key <= '9' && keys()[+ev.key - 1]) { G.civ = keys()[+ev.key - 1]; if (G.foe === G.civ) rollFoe(); RB.resetGround(); }
+    if (ev.key === 'Escape') G.view.holding = null;
+    if (ev.key === 'm') AUD.on = !AUD.on;
+    if ((G.screen === 'title' || G.screen === 'end') && (ev.key === 'Enter' || ev.key === ' ')) startMatch();
+  });
+
+  // ---------- title and end screens ----------
+  function titleGeo() {
+    const u = L.unit, W = L.W, H = L.H, ks = keys(), n = ks.length, slot = Math.min(W / n, u * 5.2), cr = Math.min(slot * 0.4, u * 2.1);
+    const x0 = (W - slot * n) / 2, cy = H * 0.65, crests = [];
+    for (let i = 0; i < n; i++) crests.push({ key: ks[i], cx: x0 + slot * (i + 0.5), cy: cy, r: cr, rect: { x: x0 + slot * i, y: cy - cr - u * 0.6, w: slot, h: cr * 2 + u * 1.2 } });
+    const bw = Math.min(W - u * 3, u * 20), bh = u * 3.3;
+    return { crests: crests, cr: cr, go: { x: (W - bw) / 2, y: H * 0.83 - bh / 2, w: bw, h: bh }, foe: { x: W * 0.52, y: H * 0.3, w: W * 0.48, h: H * 0.24 }, stage: H * 0.47 };
+  }
+  function titleTap(p) {
+    const B = titleGeo();
+    for (const c of B.crests) if (hitRect(p, c.rect)) { if (G.civ !== c.key) { G.civ = c.key; if (G.foe === G.civ) rollFoe(); RB.resetGround(); } sfx('tap'); return; }
+    if (hitRect(p, B.go)) { startMatch(); return; }
+    if (hitRect(p, B.foe)) { const was = G.foe; rollFoe(); if (G.foe === was) rollFoe(); sfx('tap'); }
+  }
+  function endButtons() { const u = L.unit, W = L.W, H = L.H, w = Math.min(W - u * 3, u * 20), h = u * 3.3; const y = G.endBtnY || H * 0.66; return { again: { x: (W - w) / 2, y: y, w: w, h: h }, title: { x: (W - w) / 2, y: y + h + u * 0.8, w: w, h: h * 0.85 } }; }
+  function endTap(p) { const B = endButtons(); if (hitRect(p, B.again)) { rollFoe(); startMatch(); } else if (hitRect(p, B.title)) { G.screen = 'title'; rollFoe(); sfx('tap'); } }
+
+  function button(r, text, active, big) {
+    const u = L.unit, pal = RB.civPal(G.civ);
+    const g = ctx.createLinearGradient(0, r.y, 0, r.y + r.h);
+    if (active) { g.addColorStop(0, '#ffd36a'); g.addColorStop(1, '#d9962a'); } else { g.addColorStop(0, '#32271e'); g.addColorStop(1, '#241b14'); }
+    ctx.fillStyle = g; RB.roundRect(ctx, r.x, r.y, r.w, r.h, r.h / 2); ctx.fill();
+    ctx.strokeStyle = active ? '#fff1c0' : '#6b5a48'; ctx.lineWidth = 2; RB.roundRect(ctx, r.x, r.y, r.w, r.h, r.h / 2); ctx.stroke();
+    ctx.fillStyle = active ? RB.LOOK.ink : RB.LOOK.paper; ctx.font = (big ? 'bold ' : '') + Math.round(u * (big ? 1.15 : 0.85)) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    spaced(text.toUpperCase(), r.x + r.w / 2, r.y + r.h / 2 + 1, big ? u * 0.18 : u * 0.1);
+  }
+  function spaced(text, cx, y, sp) {
+    let w = 0; for (const ch of text) w += ctx.measureText(ch).width + sp; w -= sp;
+    let x = cx - w / 2; const al = ctx.textAlign; ctx.textAlign = 'left';
+    for (const ch of text) { ctx.fillText(ch, x, y); x += ctx.measureText(ch).width + sp; }
+    ctx.textAlign = al;
+  }
+  function brand(y) {
+    const u = L.unit;
+    ctx.fillStyle = '#8a7f70'; ctx.font = Math.round(u * 0.6) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('An AZTMM game', L.W / 2, y); ctx.fillText('© 2026 AZTMM HLDGS LLC', L.W / 2, y + u * 0.9);
+  }
+  function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; }
+  function heroOf(key) { const i = info(key); if (i.hero && RB.CARDS[i.hero]) return i.hero; const d = RB.DECKS[key]; return d ? d[d.length - 1] : null; }
+  function stageFigure(key, x, y, s, now, flip) {
+    const id = heroOf(key); ctx.save(); ctx.translate(x, y);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(0, s * 0.12, s * 1.0, s * 0.3, 0, 0, 6.283); ctx.fill();
+    let ok = false;
+    if (RB.drawFigure && id) { try { RB.drawFigure(ctx, id, flip ? 1 : 0, s, now * 3, { hurt: 0, hero: true, buff: false, facing: flip ? -1 : 1 }); ok = true; } catch (e) { ok = false; } }
+    if (!ok) { if (flip) ctx.scale(-1, 1); RB.drawMan(ctx, s, RB.civPal(key), now * 2 + (flip ? 1 : 0), 'commander', flip ? 1 : 0, 0); }
+    ctx.restore();
+  }
+  function drawTitle(now) {
+    const u = L.unit, W = L.W, H = L.H, B = titleGeo(), pal = RB.civPal(G.civ), fpal = RB.civPal(G.foe);
+    ctx.fillStyle = RB.LOOK.bg; ctx.fillRect(0, 0, W, H);
+    // dusk sky tinted by the chosen civ
+    const sky = ctx.createLinearGradient(0, 0, 0, B.stage + u * 2); sky.addColorStop(0, '#0f0c0a'); sky.addColorStop(0.55, hexA(pal.dark, 0.75)); sky.addColorStop(1, hexA(pal.body, 0.55));
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, B.stage + u * 2);
+    const gy = B.stage + u * 1.5; ctx.fillStyle = hexA(pal.flag, 0.30); ctx.beginPath(); ctx.arc(W / 2, gy, u * 10.5, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = hexA(pal.metal, 0.45); ctx.beginPath(); ctx.arc(W / 2, gy, u * 6.8, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = 'rgba(255,246,220,0.55)'; for (let i = 0; i < 38; i++) { const sx = ((i * 0.6180339 * 7.31) % 1) * W, sy = (((i * 0.3819 * 5.17) + 0.07) % 1) * (B.stage - u * 8) + u * 1, tw = 0.5 + 0.5 * Math.sin(now * 1.5 + i * 2.1); ctx.globalAlpha = 0.25 + 0.4 * tw; ctx.fillRect(sx, sy, i % 5 === 0 ? 2.2 : 1.4, i % 5 === 0 ? 2.2 : 1.4); } ctx.globalAlpha = 1;
+    // far ridge and walls
+    ctx.fillStyle = '#1d1712'; ctx.beginPath(); ctx.moveTo(0, gy);
+    for (let x = 0; x <= W; x += W / 30) { const k = x / W; ctx.lineTo(x, gy - Math.abs(Math.sin(k * 8 + 1)) * u * 1.3 - Math.abs(Math.sin(k * 21)) * u * 0.4); }
+    ctx.lineTo(W, gy + u * 2); ctx.lineTo(0, gy + u * 2); ctx.closePath(); ctx.fill();
+    // the ground the two stand on
+    const gr = ctx.createLinearGradient(0, gy - u, 0, gy + u * 5); gr.addColorStop(0, '#2a2119'); gr.addColorStop(1, '#14110e'); ctx.fillStyle = gr; ctx.fillRect(0, gy - u * 0.4, W, u * 6);
+    // the two heroes
+    const s = u * 3.0;
+    stageFigure(G.civ, W * 0.27, B.stage + u * 2.2, s, now, false);
+    stageFigure(G.foe, W * 0.73, B.stage + u * 2.2, s, now, true);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = RB.LOOK.paper; ctx.font = 'bold ' + Math.round(u * 1.3) + 'px system-ui, sans-serif'; ctx.globalAlpha = 0.9; ctx.fillText('VS', W / 2, B.stage - u * 2.2); ctx.globalAlpha = 1;
+    ctx.font = 'bold ' + Math.round(u * 0.8) + 'px system-ui, sans-serif'; ctx.fillStyle = pal.body === '#000' ? '#fff' : RB.LOOK.paper;
+    ctx.fillText(info(G.civ).name || G.civ, W * 0.27, B.stage + u * 4.6);
+    ctx.fillText(info(G.foe).name || G.foe, W * 0.73, B.stage + u * 4.6);
+    ctx.font = Math.round(u * 0.55) + 'px system-ui, sans-serif'; ctx.fillStyle = RB.LOOK.haze;
+    ctx.fillText('YOU', W * 0.27, B.stage + u * 5.6); ctx.fillText('OPPONENT  ↻', W * 0.73, B.stage + u * 5.6);
+    // the name
+    const grad = ctx.createLinearGradient(0, H * 0.09, 0, H * 0.2); grad.addColorStop(0, '#fff6dc'); grad.addColorStop(1, RB.LOOK.energy);
+    ctx.fillStyle = grad; ctx.font = '800 ' + Math.round(u * 4.6) + 'px system-ui, sans-serif'; spaced('EPOCH', W / 2, H * 0.135, u * 0.55);
+    ctx.fillStyle = RB.LOOK.haze; ctx.font = Math.round(u * 0.72) + 'px system-ui, sans-serif'; spaced('THE WORLD\'S FIGHTING CULTURES. ONE FIELD.', W / 2, H * 0.135 + u * 3.0, u * 0.12);
+    // crest row
+    ctx.fillStyle = RB.LOOK.paper; ctx.font = Math.round(u * 0.62) + 'px system-ui, sans-serif'; spaced('CHOOSE YOUR PEOPLE', W / 2, B.crests[0].cy - B.cr - u * 1.5, u * 0.14);
+    for (const c of B.crests) {
+      const sel = c.key === G.civ;
+      ctx.save(); ctx.globalAlpha = sel ? 1 : 0.62;
+      RB.drawCrest(ctx, c.key, c.cx, c.cy - (sel ? u * 0.3 : 0), c.r * (sel ? 1.12 : 0.95), sel);
+      ctx.restore();
+      if (sel) { ctx.fillStyle = RB.civPal(c.key).body; ctx.beginPath(); ctx.arc(c.cx, c.cy + c.r * 1.12 + u * 0.35, 3, 0, 6.283); ctx.fill(); }
+    }
+    // the chosen civ in a line or two
+    const I = info(G.civ), cy = B.crests[0].cy + B.cr + u * 1.6;
+    ctx.fillStyle = RB.LOOK.paper; ctx.font = 'bold ' + Math.round(u * 1.05) + 'px system-ui, sans-serif'; ctx.fillText(I.name || G.civ, W / 2, cy);
+    ctx.fillStyle = RB.LOOK.haze; ctx.font = Math.round(u * 0.68) + 'px system-ui, sans-serif'; const by2 = wrapText(I.blurb || '', W / 2, cy + u * 1.5, Math.min(W - u * 3, u * 21), u * 1.05, 2);
+    if (I.ruleName) { ctx.fillStyle = RB.civPal(G.civ).body; ctx.font = 'bold ' + Math.round(u * 0.62) + 'px system-ui, sans-serif'; ctx.fillText(I.ruleName.toUpperCase(), W / 2, by2 + u * 1.7); ctx.fillStyle = RB.LOOK.haze; ctx.font = Math.round(u * 0.62) + 'px system-ui, sans-serif'; wrapText(I.ruleText || '', W / 2, by2 + u * 2.7, Math.min(W - u * 3, u * 21), u * 0.95, 2); }
+    button(B.go, 'To the field', true, true);
+    brand(H - u * 2.4);
+  }
+  function drawEnd(now) {
+    const u = L.unit, W = L.W, H = L.H;
+    if (!G.endBg || G.endBg.w !== canvas.width || G.endBg.h !== canvas.height) {
+      RB.drawMatch(ctx, L, G.M, G.view, G.fx, G.clock); ctx.fillStyle = 'rgba(10,8,6,0.92)'; ctx.fillRect(0, 0, W, H);
+      const c = document.createElement('canvas'); c.width = canvas.width; c.height = canvas.height; c.getContext('2d').drawImage(canvas, 0, 0); G.endBg = { c: c, w: canvas.width, h: canvas.height };
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(G.endBg.c, 0, 0); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const wkey = G.winKey || G.civ, wp = RB.civPal(wkey);
+    RB.drawCrest(ctx, wkey, W / 2, H * 0.17, u * 3.2, true);
+    ctx.fillStyle = G.won ? RB.LOOK.energy : '#e0705c'; ctx.font = '800 ' + Math.round(u * 2.5) + 'px system-ui, sans-serif';
+    spaced(G.won ? 'VICTORY' : 'DEFEAT', W / 2, H * 0.3, u * 0.35);
+    ctx.fillStyle = wp.body; ctx.fillRect(W / 2 - u * 2, H * 0.3 + u * 2.0, u * 4, 2);
+    ctx.fillStyle = RB.LOOK.paper; ctx.font = 'italic ' + Math.round(u * 1.05) + 'px Georgia, serif';
+    const ly = wrapText('“' + G.verdict + '”', W / 2, H * 0.42, Math.min(W - u * 4, u * 21), u * 1.7, 6);
+    ctx.fillStyle = '#9a8f7e'; ctx.font = Math.round(u * 0.68) + 'px system-ui, sans-serif'; ctx.fillText('The bard of ' + G.verdictBy, W / 2, ly + u * 2.2);
+    G.endBtnY = ly + u * 6; const B = endButtons();
+    button(B.again, 'Fight again', true, true); button(B.title, 'Change people', false);
+  }
+  function wrapText(text, x, y, maxW, lh, maxLines) {
+    const words = text.split(' '); let line = '', yy = y, n = 0;
+    for (const w of words) { const t = line ? line + ' ' + w : w; if (ctx.measureText(t).width > maxW && line) { ctx.fillText(line, x, yy); line = w; yy += lh; n++; } else line = t; }
+    if (line) ctx.fillText(line, x, yy);
+    return yy;
+  }
+
+  // ---------- loop ----------
+  function drawSlowmo(rn) {
+    const u = L.unit, a = Math.min(1, G.slow / 0.15, (0.8 - G.slow) / 0.1 + 0.3);
+    const g = ctx.createRadialGradient(L.W / 2, L.fy + L.fh / 2, L.fh * 0.25, L.W / 2, L.fy + L.fh / 2, L.fh * 0.7);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,' + (0.7 * a) + ')');
+    ctx.fillStyle = g; ctx.fillRect(L.fx, L.fy, L.fw, L.fh);
+    const bar = u * 1.2 * Math.min(1, a * 1.5); ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(L.fx, L.fy, L.fw, bar); ctx.fillRect(L.fx, L.fy + L.fh - bar, L.fw, bar);
+  }
+  function frame(ms) {
+    const rn = ms / 1000;
+    const dt = Math.min(0.1, rn - (G.lastT || rn)); G.lastT = rn;
+    if (G.screen === 'match' || (G.screen === 'end' && !G.M.over)) {
+      const M = G.M, V = G.view;
+      // the feel: scale the sim's dt here, never inside RB.tick
+      let scale = 1;
+      if (G.freeze > 0) { scale = 0; G.freeze = Math.max(0, G.freeze - dt); }
+      else if (G.slow > 0) { scale = 0.35; G.slow = Math.max(0, G.slow - dt); if (G.slow === 0 && G.pendingHit) { G.pendingHit = false; sfx('towerfall'); V.shake = 1; V.punch = Math.max(V.punch, 0.6); G.slowAt = null; } }
+      G.clock += dt * scale; G.acc += dt * scale;
+      const step = 1 / 30;
+      while (G.acc >= step && !M.over) { RB.tick(M, step); G.ai.think(M); G.acc -= step; }
+      handleEvents(M, G.clock, rn);
+      drum(M, G.clock);
+      V.shake = Math.max(0, V.shake - dt * 2.5); V.punch = Math.max(0, V.punch - dt * 2.2);
+      let z = 1 + 0.02 * V.punch, fp = { x: L.W / 2, y: L.fy + L.fh / 2 };
+      if (G.slow > 0 && G.slowAt) { const k = Math.sin(Math.min(1, (0.8 - G.slow) / 0.8) * 3.14159); z += 0.045 * k; fp = RB.toScreen(L, G.slowAt.x, G.slowAt.y); }
+      V.cam = z > 1.0005 ? { z: z, x: fp.x, y: fp.y } : null;
+      G.fx = G.fx.filter(function (f) { return G.clock - f.t0 < f.dur; });
+      RB.drawMatch(ctx, L, M, V, G.fx, G.clock);
+      if (G.slow > 0) drawSlowmo(rn);
+      if (V.note && rn - V.note.t < 1.6) {
+        ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.font = Math.round(L.unit * 0.75) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const tw = ctx.measureText(V.note.text).width + L.unit * 2, ny = L.fy + L.fh - L.unit * 5; ctx.fillRect(L.W / 2 - tw / 2, ny, tw, L.unit * 1.4);
+        ctx.fillStyle = RB.LOOK.energy; ctx.fillText(V.note.text, L.W / 2, ny + L.unit * 0.7);
+      }
+    } else if (G.screen === 'title') drawTitle(rn);
+    else if (G.screen === 'end') drawEnd(rn);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // For the Playwright run and the console
+  window.EPOCH = { G: G, start: startMatch, setScreen: function (s) { G.screen = s; }, RB: RB, mute: function () { AUD.on = false; }, bard: BARD };
+})();
+
+</script>
+</body>
+</html>

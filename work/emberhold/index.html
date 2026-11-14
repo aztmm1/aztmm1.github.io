@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="../../assets/img/favicon-64.png">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emberhold · by invitation · AZTMM Gaming Labs</title>
+<style>
+@font-face{font-family:'Instrument Serif';src:url(../../assets/fonts/instrument-serif.woff2) format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'Outfit';src:url(../../assets/fonts/outfit.woff2) format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'Outfit';src:url(../../assets/fonts/outfit-bold.woff2) format('woff2');font-weight:700;font-display:swap}
+html,body{margin:0;background:#07080c;color:#f3efe6;font:400 17px/1.6 'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+.wrap{max-width:600px;margin:0 auto;padding:14vh 24px 10vh}
+.eyebrow{margin:0 0 16px;font:700 12px/1 'Outfit',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#e8c47a}
+h1{font:400 clamp(48px,11vw,84px)/.95 'Instrument Serif',Georgia,serif;margin:0 0 20px}
+p{color:#b4b0a6;margin:0 0 16px}
+a{color:#e8c47a}
+form{display:flex;gap:10px;flex-wrap:wrap;margin-top:28px}
+input{flex:1 1 220px;min-height:52px;padding:0 16px;border-radius:6px;border:1px solid rgba(255,255,255,.18);background:#0e1017;color:#f3efe6;font:400 16px 'Outfit',sans-serif}
+input::placeholder{color:#86837c}
+button{min-height:52px;padding:0 24px;border-radius:6px;border:0;background:#e8c47a;color:#17120a;font:700 16px 'Outfit',sans-serif;cursor:pointer}
+button:hover{background:#f3d79b}
+:focus-visible{outline:2px solid #e8c47a;outline-offset:3px}
+.note{margin-top:12px;font-size:13px;color:#86837c}
+.note[data-state=ok]{color:#86dba7}
+.note[data-state=bad]{color:#ff8a7a}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.invite .hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+.more{margin-top:48px;padding-top:24px;border-top:1px solid rgba(255,255,255,.10);font-size:15px}
+</style>
+</head>
+<body><main class="wrap">
+<p class="eyebrow">By invitation</p>
+<h1>Emberhold</h1>
+<p>Our fantasy fiction game is with a small group of invited testers for now. Leave your email if you would like an invite to try it.</p>
+<div class="invite"><div><form novalidate><label class="sr" for="inv-email">Your email</label>
+<input id="inv-email" type="email" name="email" autocomplete="email" inputmode="email" placeholder="you@example.com" required>
+<input class="hp" type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true">
+<button type="submit">Ask for an invite</button></form>
+<p class="note" role="status" aria-live="polite">We keep your address only to send the invite. <a href="../../privacy/index.html">Privacy</a></p></div></div>
+<p class="more">Already invited? Use the link in your invitation. Everything else we make is on the <a href="../../index.html">home page</a>, and you can always write to <a href="mailto:game@aztmm.com">game@aztmm.com</a>.</p>
+</main>
+<script>
+(function () {
+  document.querySelectorAll('.invite form').forEach(function (f) { f.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var em = f.email.value.trim(), note = f.parentNode.querySelector('.note'), btn = f.querySelector('button');
+    function say(text, state) { note.textContent = text; note.setAttribute('data-state', state); }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em)) { say('That does not look like an email address. Please check it.', 'bad'); f.email.focus(); return; }
+    btn.disabled = true;
+    fetch('https://aztmm-play.aztmmhldgs.workers.dev/i', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ email: em, game: 'emberhold', trap: f.company.value }) })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); say('You are on the list. We will write to ' + em + ' when a place opens.', 'ok'); f.reset(); })
+      .catch(function () {
+        location.href = 'mailto:game@aztmm.com?subject=' + encodeURIComponent('Emberhold invite') + '&body=' + encodeURIComponent('Please send me an invite to try Emberhold.\n\nMy email: ' + em);
+        say('We could not save that just now, so your email app has opened with the request instead. Press send and you are on the list.', 'ok');
+      })
+      .then(function () { btn.disabled = false; });
+  }); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14181d">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex">
+<title>Emberhold</title>
+<style>
+@font-face{font-family:'Crimson Pro';src:url(../../assets/fonts/crimson.woff2) format('woff2');font-weight:200 900;font-display:swap}
+html,body{margin:0;height:100%;background:#14181d;color:#efe6d6;overflow:hidden}
+body{font:22px/1.4 'Crimson Pro',Georgia,serif;display:flex;align-items:center;justify-content:center;text-align:center}
+#msg{padding:24px}#msg:before{content:"";display:block;margin:0 auto 14px;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#ffd08a,#e8883a 55%,#c4404a);box-shadow:0 0 16px 4px rgba(232,136,58,.5);animation:b 1.6s ease-in-out infinite}
+@keyframes b{50%{opacity:.45;transform:scale(.8)}}
+@media (prefers-reduced-motion:reduce){#msg:before{animation:none}}
+iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#14181d}
+a{color:#f0a45a}
+</style>
+</head>
+<body>
+<div id="msg">Opening Emberhold&hellip;<noscript><br>This page needs JavaScript. <a href="index.html">Back to the tester page</a></noscript></div>
+<script src="gate.js"></script>
+<script>
+/* The build opens only after the tester agreement is signed on this device; otherwise back to the agreement gate. */
+(function () {
+  if (!window.EMB_GATE || !EMB_GATE.saved()) { location.replace('index.html?from=play'); return; }
+  var f = document.createElement('iframe');
+  f.title = 'Emberhold';
+  f.setAttribute('allow', 'fullscreen; gamepad; autoplay; accelerometer; gyroscope');
+  f.setAttribute('allowfullscreen', '');
+  f.src = 'build.html';
+  f.addEventListener('load', function () { var m = document.getElementById('msg'); if (m) m.remove(); try { f.contentWindow.focus(); } catch (e) { /* ignore */ } });
+  document.body.appendChild(f);
+})();
+</script>
+</body>
+</html>

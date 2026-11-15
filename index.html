@@ -13,7 +13,7 @@
 <meta property="og:image" content="https://aztmm.com/media/lea/hero-poster.jpg">
 <link rel="preload" href="assets/fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/fonts/outfit.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/css/studio.css?v=8">
+<link rel="stylesheet" href="assets/css/studio.css?v=9">
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -85,7 +85,7 @@
 
 <dialog class="strailer" aria-label="Lea trailer">
 <button class="close" type="button" aria-label="Close the trailer"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
-<video controls playsinline preload="none" poster="media/lea/trailer-poster.jpg?v=5"><source src="media/lea/trailer.mp4?v=5" type="video/mp4"></video>
+<video controls playsinline preload="none" poster="media/lea/trailer-poster.jpg?v=6"><source src="media/lea/trailer.mp4?v=6" type="video/mp4"></video>
 </dialog>
 
 <script>
@@ -97,11 +97,12 @@ try { var azh = document.referrer ? new URL(document.referrer).hostname : ''; if
   var v = document.querySelector('.shero-v'), still = matchMedia('(prefers-reduced-motion: reduce)');
   if (!still.matches) v.play().catch(function () {});
   var d = document.querySelector('dialog.strailer'), tv = d.querySelector('video');
-  var lea = [tv.querySelector('source').getAttribute('src'), tv.getAttribute('poster')];
-  document.querySelectorAll('[data-trailer]').forEach(function (b) { b.addEventListener('click', function () {
-    var src = b.getAttribute('data-trailer') || lea[0], poster = b.getAttribute('data-poster') || lea[1];
+  var LEA = { wide: ['media/lea/trailer-wide.mp4?v=1', 'media/lea/trailer-wide-poster.jpg?v=1'], tall: ['media/lea/trailer.mp4?v=6', 'media/lea/trailer-poster.jpg?v=6'] }, upright = matchMedia('(max-width:700px) and (orientation:portrait)');
+  document.querySelectorAll('[data-trailer]').forEach(function (b) { b.addEventListener('click', function () {      /* a button with no address of its own opens Lea's newest trailer, in the cut that fits the screen */
+    var own = b.getAttribute('data-trailer'), wide = own ? b.hasAttribute('data-wide') : !upright.matches;
+    var src = own || LEA[wide ? 'wide' : 'tall'][0], poster = own ? b.getAttribute('data-poster') : LEA[wide ? 'wide' : 'tall'][1];
     if (tv.querySelector('source').getAttribute('src') !== src) { tv.querySelector('source').setAttribute('src', src); tv.setAttribute('poster', poster); tv.load(); }
-    d.classList.toggle('wide', b.hasAttribute('data-wide')); d.setAttribute('aria-label', b.textContent); d.showModal(); v.pause(); tv.play().catch(function () {});
+    d.classList.toggle('wide', wide); d.setAttribute('aria-label', b.textContent); d.showModal(); v.pause(); tv.play().catch(function () {});
   }); });
   function shut() { tv.pause(); d.close(); if (!still.matches) v.play().catch(function () {}); }
   d.querySelector('.close').addEventListener('click', shut);

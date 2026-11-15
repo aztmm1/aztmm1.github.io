@@ -175,6 +175,12 @@ dialog.strailer .close svg{width:18px;height:18px}
 dialog.strailer.wide{max-width:min(94vw,1100px)}
 dialog.strailer.wide video{aspect-ratio:16/9;max-height:80svh}
 .film-wide{width:100%;aspect-ratio:16/9;border-radius:var(--r-media);background:#000;box-shadow:var(--lift)}
+/* the cinematic trailer has two cuts: the wide one plays in the page on a wide screen, the upright one on a phone held upright; a button opens the other */
+.cine video{display:block}
+.cine .cine-tall{display:none;width:min(100%,380px);aspect-ratio:9/16;margin:0 auto;border-radius:var(--r-media);background:#000;box-shadow:var(--lift)}
+.cine-note{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 24px;margin-top:20px;color:var(--text-3);font-size:14px}
+.cine-note .cine-to-wide{display:none}
+@media (max-width:700px) and (orientation:portrait){ .cine .film-wide{display:none} .cine .cine-tall{display:block} .cine-note{justify-content:center;text-align:center} .cine-note .cine-to-tall{display:none} .cine-note .cine-to-wide{display:inline-flex} }
 .tshelf-h{margin:44px 0 0;font:600 13px/1 var(--sans);letter-spacing:.16em;text-transform:uppercase;color:var(--text-3)}
 .tshelf{list-style:none;margin:16px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,196px));gap:16px}
 .tshelf button{display:block;width:100%;padding:0;border:1px solid var(--line);border-radius:var(--r-media);background:var(--ink-1);color:var(--text-2);overflow:hidden;cursor:pointer;text-align:left;font:inherit}

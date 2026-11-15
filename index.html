@@ -80,12 +80,12 @@
 <p>Found a glitch, or something interesting? Write to <a href="mailto:game@aztmm.com">game@aztmm.com</a>. We read every message.</p>
 <p>AZTMM HLDGS LLC also publishes SomerQuant, a markets publication. <a href="https://somerquant.com">somerquant.com</a></p>
 <p class="foot-links"><a href="terms/index.html">Terms</a><a href="privacy/index.html">Privacy</a><a href="licences.txt">Licences</a></p>
-<p class="built">Built using Claude.</p>
+<p class="built">Built using Claude Fable 5.2.</p>
 </div></div></footer>
 
 <dialog class="strailer" aria-label="Lea trailer">
 <button class="close" type="button" aria-label="Close the trailer"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
-<video controls playsinline preload="none" poster="media/lea/trailer-poster.jpg?v=6"><source src="media/lea/trailer.mp4?v=7" type="video/mp4"></video>
+<video controls playsinline preload="none" poster="media/lea/trailer-poster.jpg?v=6"><source src="media/lea/trailer.mp4?v=8" type="video/mp4"></video>
 </dialog>
 
 <script>
@@ -97,7 +97,7 @@ try { var azh = document.referrer ? new URL(document.referrer).hostname : ''; if
   var v = document.querySelector('.shero-v'), still = matchMedia('(prefers-reduced-motion: reduce)');
   if (!still.matches) v.play().catch(function () {});
   var d = document.querySelector('dialog.strailer'), tv = d.querySelector('video');
-  var LEA = { wide: ['media/lea/trailer-wide.mp4?v=2', 'media/lea/trailer-wide-poster.jpg?v=1'], tall: ['media/lea/trailer.mp4?v=7', 'media/lea/trailer-poster.jpg?v=6'] }, upright = matchMedia('(max-width:700px) and (orientation:portrait)');
+  var LEA = { wide: ['media/lea/trailer-wide.mp4?v=3', 'media/lea/trailer-wide-poster.jpg?v=1'], tall: ['media/lea/trailer.mp4?v=8', 'media/lea/trailer-poster.jpg?v=6'] }, upright = matchMedia('(max-width:700px) and (orientation:portrait)');
   document.querySelectorAll('[data-trailer]').forEach(function (b) { b.addEventListener('click', function () {      /* a button with no address of its own opens Lea's newest trailer, in the cut that fits the screen */
     var own = b.getAttribute('data-trailer'), wide = own ? b.hasAttribute('data-wide') : !upright.matches;
     var src = own || LEA[wide ? 'wide' : 'tall'][0], poster = own ? b.getAttribute('data-poster') : LEA[wide ? 'wide' : 'tall'][1];

@@ -65,13 +65,13 @@
 </div></section>
 
 <section class="ssec" id="trailers" aria-labelledby="tr-h"><div class="wrap">
-<header class="ssec-head"><h2 id="tr-h">The cinematic trailer</h2><p>Fifty seconds. It opens on Hubble’s Whirlpool Galaxy and Webb’s Tarantula Nebula, then runs all twelve worlds. Filmed inside the game with a film camera, to the last piece of the score: the pipe organ carries the tune, and every instrument of the journey joins it at the climax.</p></header>
+<header class="ssec-head"><h2 id="tr-h">The cinematic trailer</h2><p>Fifty seconds. It opens on Hubble’s Whirlpool Galaxy and Webb’s Tarantula Nebula, runs all twelve worlds in ten seconds, and flies on through the Cartwheel Galaxy, Stephan’s Quintet, the Pinwheel Galaxy and the Orion Nebula. Filmed inside the game with a film camera, to the last piece of the score: the pipe organ carries the tune, and every instrument of the journey joins it at the climax.</p></header>
 <div class="cine">
-<video class="film-wide trailer-inline" controls playsinline preload="none" poster="../../media/lea/trailer-wide-poster.jpg?v=1" aria-label="Lea, the cinematic trailer: fifty seconds, the wide cut."><source src="../../media/lea/trailer-wide.mp4?v=3" type="video/mp4"></video>
-<video class="cine-tall trailer-inline" controls playsinline preload="none" poster="../../media/lea/trailer-poster.jpg?v=6" aria-label="Lea, the cinematic trailer: fifty seconds, the upright cut."><source src="../../media/lea/trailer.mp4?v=8" type="video/mp4"></video>
+<video class="film-wide trailer-inline" controls playsinline preload="none" poster="../../media/lea/trailer-wide-poster.jpg?v=1" aria-label="Lea, the cinematic trailer: fifty seconds, the wide cut."><source src="../../media/lea/trailer-wide.mp4?v=4" type="video/mp4"></video>
+<video class="cine-tall trailer-inline" controls playsinline preload="none" poster="../../media/lea/trailer-poster.jpg?v=6" aria-label="Lea, the cinematic trailer: fifty seconds, the upright cut."><source src="../../media/lea/trailer.mp4?v=9" type="video/mp4"></video>
 <div class="cine-note"><span>Two cuts of the same film: wide for a big screen, upright for a phone.</span>
-<button class="sbtn ghost cine-to-tall" type="button" data-trailer="../../media/lea/trailer.mp4?v=8" data-poster="../../media/lea/trailer-poster.jpg?v=6"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7.5-4.5z" fill="currentColor"/></svg>Watch the upright cut</button>
-<button class="sbtn ghost cine-to-wide" type="button" data-trailer="../../media/lea/trailer-wide.mp4?v=3" data-poster="../../media/lea/trailer-wide-poster.jpg?v=1" data-wide><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7.5-4.5z" fill="currentColor"/></svg>Watch the wide cut</button></div>
+<button class="sbtn ghost cine-to-tall" type="button" data-trailer="../../media/lea/trailer.mp4?v=9" data-poster="../../media/lea/trailer-poster.jpg?v=6"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7.5-4.5z" fill="currentColor"/></svg>Watch the upright cut</button>
+<button class="sbtn ghost cine-to-wide" type="button" data-trailer="../../media/lea/trailer-wide.mp4?v=4" data-poster="../../media/lea/trailer-wide-poster.jpg?v=1" data-wide><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7.5-4.5z" fill="currentColor"/></svg>Watch the wide cut</button></div>
 </div>
 </div>
 <div class="wrap"><h3 class="tshelf-h">Shorts</h3>
@@ -108,7 +108,7 @@
 </div></div></footer>
 <dialog class="strailer" aria-label="Lea trailer">
 <button class="close" type="button" aria-label="Close the trailer"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
-<video controls playsinline preload="none" poster="../../media/lea/trailer-poster.jpg?v=6"><source src="../../media/lea/trailer.mp4?v=8" type="video/mp4"></video>
+<video controls playsinline preload="none" poster="../../media/lea/trailer-poster.jpg?v=6"><source src="../../media/lea/trailer.mp4?v=9" type="video/mp4"></video>
 </dialog>
 <script>
 try { var azh = document.referrer ? new URL(document.referrer).hostname : ''; if (azh && azh.indexOf('aztmm.com') < 0) localStorage.setItem('az_from', azh.toLowerCase().replace(/^www\./, '').replace(/[^a-z0-9.-]/g, '').slice(0, 24) + '|' + Date.now()); } catch (e) {}
@@ -116,7 +116,7 @@ try { var azh = document.referrer ? new URL(document.referrer).hostname : ''; if
   var v = document.querySelector('.shero-v'), still = matchMedia('(prefers-reduced-motion: reduce)');
   if (!still.matches) v.play().catch(function () {});
   var d = document.querySelector('dialog.strailer'), tv = d.querySelector('video');
-  var CUTS = { wide: ['../../media/lea/trailer-wide.mp4?v=3', '../../media/lea/trailer-wide-poster.jpg?v=1'], tall: ['../../media/lea/trailer.mp4?v=8', '../../media/lea/trailer-poster.jpg?v=6'] }, upright = matchMedia('(max-width:700px) and (orientation:portrait)');
+  var CUTS = { wide: ['../../media/lea/trailer-wide.mp4?v=4', '../../media/lea/trailer-wide-poster.jpg?v=1'], tall: ['../../media/lea/trailer.mp4?v=9', '../../media/lea/trailer-poster.jpg?v=6'] }, upright = matchMedia('(max-width:700px) and (orientation:portrait)');
   var inline = document.querySelectorAll('.trailer-inline');
   document.querySelectorAll('[data-trailer]').forEach(function (b) { b.addEventListener('click', function () {      /* a button with no address of its own opens the newest trailer, in the cut that fits the screen */
     var own = b.getAttribute('data-trailer'), wide = own ? b.hasAttribute('data-wide') : !upright.matches;

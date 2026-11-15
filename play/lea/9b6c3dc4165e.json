@@ -1,0 +1,139 @@
+{
+ "loops": {
+  "silver": {
+   "bpm": 84,
+   "key": 2,
+   "minor": true,
+   "len": 45.714286,
+   "driveLen": 22.857143
+  }
+ },
+ "pieces": {
+  "piece1": {
+   "worlds": [
+    "silver",
+    "sunskin"
+   ],
+   "doors": [
+    0,
+    45,
+    70,
+    115
+   ],
+   "bpm": 96,
+   "key": 2,
+   "minor": true,
+   "len": 140.0,
+   "driveLen": 20.0,
+   "gainDb": 2.2
+  },
+  "piece2": {
+   "worlds": [
+    "rust",
+    "swell"
+   ],
+   "doors": [
+    0,
+    45,
+    70,
+    115
+   ],
+   "bpm": 96,
+   "key": 9,
+   "minor": true,
+   "len": 140.0,
+   "driveLen": 20.0,
+   "gainDb": 2.2
+  },
+  "piece3": {
+   "worlds": [
+    "glass",
+    "hexagon"
+   ],
+   "doors": [
+    0,
+    45,
+    70,
+    115
+   ],
+   "bpm": 96,
+   "beats": 6,
+   "key": 4,
+   "minor": true,
+   "len": 140.0,
+   "driveLen": 20.0,
+   "gainDb": 2.2
+  },
+  "piece4": {
+   "worlds": [
+    "rings",
+    "twilight"
+   ],
+   "doors": [
+    0,
+    45,
+    70,
+    115
+   ],
+   "bpm": 96,
+   "beats": 5,
+   "key": 7,
+   "minor": false,
+   "len": 140.0,
+   "driveLen": 20.0,
+   "gainDb": 2.1
+  },
+  "piece5": {
+   "worlds": [
+    "nebula",
+    "lighthouse"
+   ],
+   "doors": [
+    0,
+    45,
+    70,
+    115
+   ],
+   "bpm": 96,
+   "key": 5,
+   "minor": false,
+   "len": 140.0,
+   "driveLen": 20.0,
+   "gainDb": 2.3
+  },
+  "piece6": {
+   "worlds": [
+    "horizon",
+    "mirror"
+   ],
+   "doors": [
+    0,
+    45,
+    70,
+    115
+   ],
+   "bpm": 96,
+   "key": 2,
+   "minor": true,
+   "len": 140.0,
+   "driveLen": 20.0,
+   "gainDb": 2.5
+  }
+ },
+ "pad": 1.0,
+ "shots": [
+  "harp",
+  "harp_hi",
+  "glock",
+  "power",
+  "hit",
+  "near",
+  "mile",
+  "shard",
+  "shield",
+  "boom",
+  "swell",
+  "beyond",
+  "singer"
+ ]
+}
